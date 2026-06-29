@@ -1,7 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Vercel handles output optimization automatically
   devIndicators: false,
 
   images: {
@@ -12,12 +11,12 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "**.onrender.com" },
     ],
     formats: ["image/avif", "image/webp"],
-    minimumCacheTTL: 86400, // 1 day
+    minimumCacheTTL: 86400,
   },
 
   // Production security headers
+  // NOTE: Do NOT set Cache-Control on /_next/static — Vercel handles that automatically
   async headers() {
-    const isDev = process.env.NODE_ENV === "development";
     return [
       {
         source: "/(.*)",
@@ -34,29 +33,6 @@ const nextConfig: NextConfig = {
             key: "Strict-Transport-Security",
             value: "max-age=63072000; includeSubDomains; preload",
           },
-          ...(isDev
-            ? []
-            : [
-                {
-                  key: "Content-Security-Policy",
-                  value: [
-                    "default-src 'self'",
-                    "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
-                    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-                    "font-src 'self' https://fonts.gstatic.com",
-                    "img-src 'self' data: blob: https:",
-                    "connect-src 'self' https://*.neon.tech https://*.onrender.com https://*.vercel.app",
-                    "frame-ancestors 'none'",
-                  ].join("; "),
-                },
-              ]),
-        ],
-      },
-      {
-        // Cache static assets aggressively
-        source: "/_next/static/(.*)",
-        headers: [
-          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
         ],
       },
       {
@@ -69,7 +45,7 @@ const nextConfig: NextConfig = {
     ];
   },
 
-  // Compiler optimizations — strip console.log in production
+  // Strip console.log in production builds
   compiler: {
     removeConsole:
       process.env.NODE_ENV === "production"
@@ -82,7 +58,7 @@ const nextConfig: NextConfig = {
     optimizePackageImports: ["lucide-react", "recharts", "@radix-ui/react-dialog"],
   },
 
-  // Redirects
+  // Root redirect to dashboard
   async redirects() {
     return [
       {
