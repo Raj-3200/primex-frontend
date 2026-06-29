@@ -1,12 +1,14 @@
 import axios from "axios";
 import { useAuthStore } from "@/stores/auth-store";
 
-const BACKEND_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+// Smart fallback:
+// - NEXT_PUBLIC_BACKEND_URL set → FastAPI on Render (/api/v1)
+// - Not set → Next.js built-in API routes (/api)
+const _backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+const BASE_URL = _backendUrl ? `${_backendUrl}/api/v1` : "/api";
 
-// All API calls go to FastAPI backend on Render
 const apiClient = axios.create({
-  baseURL: `${BACKEND_URL}/api/v1`,
+  baseURL: BASE_URL,
   headers: { "Content-Type": "application/json" },
   timeout: 30000,
 });
@@ -46,10 +48,13 @@ apiClient.interceptors.response.use(
       }
 
       try {
-        const { data } = await axios.post(
-          `${BACKEND_URL}/api/v1/auth/refresh`,
-          { refresh_token: refreshToken }
-        );
+        const refreshUrl = _backendUrl
+          ? `${_backendUrl}/api/v1/auth/refresh`
+          : "/api/auth/refresh";
+
+        const { data } = await axios.post(refreshUrl, {
+          refresh_token: refreshToken,
+        });
         localStorage.setItem("access_token", data.access_token);
         localStorage.setItem("refresh_token", data.refresh_token);
         apiClient.defaults.headers.common.Authorization = `Bearer ${data.access_token}`;

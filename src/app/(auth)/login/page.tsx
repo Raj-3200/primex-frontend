@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
+import { AUTH_BASE } from "@/lib/backend";
 
 const loginSchema = z.object({
   email: z.string().email("Enter a valid email"),
@@ -37,13 +38,11 @@ export default function LoginPage() {
     defaultValues: { email: "admin@primex.com", password: "" },
   });
 
-  const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
-
   const onSubmit = async (values: LoginForm) => {
     setIsLoading(true);
     try {
-      // POST directly to FastAPI backend on Render
-      const loginRes = await fetch(`${BACKEND_URL}/api/v1/auth/login`, {
+      // AUTH_BASE → FastAPI if configured, else Next.js /api/auth routes
+      const loginRes = await fetch(`${AUTH_BASE}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),
@@ -55,8 +54,7 @@ export default function LoginPage() {
         return;
       }
 
-      // Get user profile from FastAPI
-      const meRes = await fetch(`${BACKEND_URL}/api/v1/auth/me`, {
+      const meRes = await fetch(`${AUTH_BASE}/me`, {
         headers: { Authorization: `Bearer ${tokens.access_token}` },
       });
       const user = await meRes.json();

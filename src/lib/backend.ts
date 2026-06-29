@@ -1,20 +1,45 @@
 /**
- * PrimeX CRM — Backend API Client
+ * PrimeX CRM — Backend API Helper
  *
- * All API calls go through this module to the FastAPI backend on Render.
- * The NEXT_PUBLIC_BACKEND_URL env var controls the backend URL.
+ * Smart fallback:
+ * - If NEXT_PUBLIC_BACKEND_URL is set → calls FastAPI on Render (/api/v1/*)
+ * - If not set → falls back to built-in Next.js API routes (/api/*)
+ *
+ * This means the app works on Vercel immediately, even before the
+ * Render backend is deployed. Just add NEXT_PUBLIC_BACKEND_URL later
+ * to switch to the FastAPI backend.
  */
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
-export const API_BASE = `${BACKEND_URL}/api/v1`;
+const BACKEND_URL =
+  typeof window !== "undefined"
+    ? undefined // resolved client-side from env below
+    : undefined;
 
-/** Get stored access token from localStorage */
-function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("access_token");
+const _backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+
+/**
+ * Base URL for all API calls.
+ * - With backend:    https://primex-backend.onrender.com/api/v1
+ * - Without backend: /api  (Next.js built-in routes)
+ */
+export const API_BASE = _backendUrl ? `${_backendUrl}/api/v1` : "/api";
+
+/**
+ * Auth base URL.
+ * - With backend:    https://primex-backend.onrender.com/api/v1/auth
+ * - Without backend: /api/auth
+ */
+export const AUTH_BASE = _backendUrl
+  ? `${_backendUrl}/api/v1/auth`
+  : "/api/auth";
+
+/** Get stored access token */
+export function getToken(): string {
+  if (typeof window === "undefined") return "";
+  return localStorage.getItem("access_token") || "";
 }
 
-/** Standard headers with Bearer token */
+/** Standard auth headers */
 export function authHeaders(): HeadersInit {
   const token = getToken();
   return {
@@ -23,38 +48,27 @@ export function authHeaders(): HeadersInit {
   };
 }
 
-/** Generic API fetcher — throws on non-2xx */
+/** Fetch wrapper — throws on non-2xx with proper error message */
 export async function apiFetch<T = unknown>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const url = path.startsWith("http") ? path : `${API_BASE}${path}`;
+  const res = await fetch(url, {
     ...options,
-    headers: {
-      ...authHeaders(),
-      ...(options.headers || {}),
-    },
+    headers: { ...authHeaders(), ...(options.headers || {}) },
   });
-
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(err.detail || `API error ${res.status}`);
   }
-
   return res.json() as Promise<T>;
 }
 
-/** GET helper */
 export const apiGet = <T>(path: string) => apiFetch<T>(path);
-
-/** POST helper */
 export const apiPost = <T>(path: string, body: unknown) =>
   apiFetch<T>(path, { method: "POST", body: JSON.stringify(body) });
-
-/** PATCH helper */
 export const apiPatch = <T>(path: string, body: unknown) =>
   apiFetch<T>(path, { method: "PATCH", body: JSON.stringify(body) });
-
-/** DELETE helper */
 export const apiDelete = <T>(path: string) =>
   apiFetch<T>(path, { method: "DELETE" });
