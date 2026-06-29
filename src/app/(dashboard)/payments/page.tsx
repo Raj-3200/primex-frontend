@@ -1,4 +1,5 @@
 'use client';
+import { API_BASE } from '@/lib/backend';
 
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -26,7 +27,7 @@ function getToken() {
 }
 
 async function fetchPayments() {
-  const res = await fetch('/api/payments', {
+  const res = await fetch(`${API_BASE}/payments`, {
     headers: { Authorization: `Bearer ${getToken()}` },
   });
   if (!res.ok) throw new Error('Failed to fetch payments');

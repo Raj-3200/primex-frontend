@@ -1,4 +1,5 @@
 'use client';
+import { API_BASE } from '@/lib/backend';
 
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -27,7 +28,7 @@ function getToken() {
 }
 
 async function fetchEmployees() {
-  const res = await fetch('/api/employees', {
+  const res = await fetch(`${API_BASE}/employees`, {
     headers: { Authorization: `Bearer ${getToken()}` },
   });
   if (!res.ok) throw new Error('Failed to fetch employees');

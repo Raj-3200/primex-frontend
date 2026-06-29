@@ -1,4 +1,5 @@
 'use client';
+import { API_BASE } from '@/lib/backend';
 
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/auth-store';
@@ -83,7 +84,7 @@ export default function TanksPage() {
   const { data, isLoading, isError } = useQuery<ApiResponse>({
     queryKey: ['tank-orders'],
     queryFn: async () => {
-      const res = await fetch('/api/tanks', {
+      const res = await fetch(`${API_BASE}/tanks`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (!res.ok) throw new Error('Failed to fetch tank orders');

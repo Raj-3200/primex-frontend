@@ -37,11 +37,13 @@ export default function LoginPage() {
     defaultValues: { email: "admin@primex.com", password: "" },
   });
 
+  const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
   const onSubmit = async (values: LoginForm) => {
     setIsLoading(true);
     try {
-      // POST to Next.js API route → authenticates against Neon DB
-      const loginRes = await fetch("/api/auth/login", {
+      // POST directly to FastAPI backend on Render
+      const loginRes = await fetch(`${BACKEND_URL}/api/v1/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),
@@ -53,8 +55,8 @@ export default function LoginPage() {
         return;
       }
 
-      // Get user profile via proxy
-      const meRes = await fetch("/api/auth/me", {
+      // Get user profile from FastAPI
+      const meRes = await fetch(`${BACKEND_URL}/api/v1/auth/me`, {
         headers: { Authorization: `Bearer ${tokens.access_token}` },
       });
       const user = await meRes.json();

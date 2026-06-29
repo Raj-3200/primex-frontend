@@ -1,4 +1,5 @@
 'use client';
+import { API_BASE } from '@/lib/backend';
 
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/auth-store';
@@ -105,7 +106,7 @@ export default function AmcPage() {
   const { data, isLoading, isError } = useQuery<ApiResponse>({
     queryKey: ['amc-orders'],
     queryFn: async () => {
-      const res = await fetch('/api/amc', {
+      const res = await fetch(`${API_BASE}/amc`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (!res.ok) throw new Error('Failed to fetch AMC contracts');

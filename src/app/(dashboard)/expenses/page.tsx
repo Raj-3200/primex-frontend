@@ -1,4 +1,5 @@
 "use client";
+import { API_BASE } from "@/lib/backend";
 
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
@@ -19,7 +20,7 @@ export default function ExpensesPage() {
     queryKey: ["expenses"],
     queryFn: async () => {
       const token = localStorage.getItem("access_token");
-      const res = await fetch("/api/expenses", { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_BASE}/expenses`, { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) throw new Error("Failed");
       return res.json();
     },

@@ -1,10 +1,12 @@
 import axios from "axios";
 import { useAuthStore } from "@/stores/auth-store";
 
-// All client-side API calls go through Next.js API routes (/api/*)
-// which authenticate directly against Neon PostgreSQL
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
+// All API calls go to FastAPI backend on Render
 const apiClient = axios.create({
-  baseURL: "/api",
+  baseURL: `${BACKEND_URL}/api/v1`,
   headers: { "Content-Type": "application/json" },
   timeout: 30000,
 });
@@ -21,14 +23,12 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// ── Response: Handle 401 — attempt token refresh ──────────────────────────────
+// ── Response: Auto-refresh on 401 ────────────────────────────────────────────
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const status = error.response?.status;
-    const detail = error.response?.data?.detail || "";
 
-    // 401 = JWT invalid/expired — attempt token refresh once
     if (status === 401 && !error.config?._retry) {
       error.config._retry = true;
 
@@ -37,8 +37,7 @@ apiClient.interceptors.response.use(
           ? localStorage.getItem("refresh_token")
           : null;
 
-      if (!refreshToken || detail === "Invalid or expired token") {
-        // Genuine auth failure — clear and redirect
+      if (!refreshToken) {
         if (typeof window !== "undefined") {
           useAuthStore.getState().clearAuth();
           window.location.href = "/login";
@@ -47,9 +46,10 @@ apiClient.interceptors.response.use(
       }
 
       try {
-        const { data } = await axios.post("/api/auth/refresh", {
-          refresh_token: refreshToken,
-        });
+        const { data } = await axios.post(
+          `${BACKEND_URL}/api/v1/auth/refresh`,
+          { refresh_token: refreshToken }
+        );
         localStorage.setItem("access_token", data.access_token);
         localStorage.setItem("refresh_token", data.refresh_token);
         apiClient.defaults.headers.common.Authorization = `Bearer ${data.access_token}`;
