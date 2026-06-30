@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
         ...r,
         total_revenue: Number(r.total_revenue),
       })),
-      service_distribution: serviceDistribution,
+      service_breakdown: serviceDistribution,
       status_breakdown: statusBreakdownData,
     });
   } catch (err) {

@@ -165,6 +165,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ...order, total_amount: Number(order.total_amount) }, { status: 201 });
   } catch (err: any) {
     console.error("[Orders POST]", err);
-    return NextResponse.json({ detail: err?.message || "Failed to create order" }, { status: 500 });
+    return NextResponse.json({ detail: "Failed to create order" }, { status: 500 });
   }
 }

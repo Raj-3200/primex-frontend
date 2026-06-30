@@ -1,21 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import jwt from "jsonwebtoken";
-
-const DB = "postgresql://neondb_owner:npg_R2ABjSL4EfPT@ep-royal-sun-adbm2icx-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require";
-const SECRET = process.env.JWT_SECRET || "primex-crm-secret-key-2024-neon-production";
-
-function auth(req: NextRequest) {
-  const token = (req.headers.get("authorization") || "").replace("Bearer ", "").trim();
-  if (!token) throw new Error("No token");
-  return jwt.verify(token, SECRET, { algorithms: ["HS256"] });
-}
+import { DB_URL, requireAuth } from "@/lib/server-auth";
 
 export async function GET(req: NextRequest) {
-  try { auth(req); } catch { return NextResponse.json({ detail: "Unauthorized" }, { status: 401 }); }
+  const authError = requireAuth(req);
+  if (authError) return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
+
 
   try {
-    const sql = neon(DB);
+    const sql = neon(DB_URL);
     const today = new Date().toISOString().split("T")[0];
     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
     const yearStart = new Date(new Date().getFullYear(), 0, 1).toISOString().split("T")[0];

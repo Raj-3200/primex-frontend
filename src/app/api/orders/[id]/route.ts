@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
+import { DB_URL, SECRET } from "@/lib/server-auth";
 import jwt from "jsonwebtoken";
-
-const DB = "postgresql://neondb_owner:npg_R2ABjSL4EfPT@ep-royal-sun-adbm2icx-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require";
-const SECRET = process.env.JWT_SECRET || "primex-crm-secret-key-2024-neon-production";
 
 function auth(req: NextRequest): { sub: string; role: string } {
   const token = (req.headers.get("authorization") || "").replace("Bearer ", "").trim();
@@ -13,12 +11,13 @@ function auth(req: NextRequest): { sub: string; role: string } {
 
 type Params = { params: Promise<{ id: string }> };
 
+
 // GET /api/orders/[id]
 export async function GET(req: NextRequest, { params }: Params) {
   try { auth(req); } catch { return NextResponse.json({ detail: "Unauthorized" }, { status: 401 }); }
   const { id } = await params;
   try {
-    const sql = neon(DB);
+    const sql = neon(DB_URL);
     const orders = await sql`
       SELECT o.*, c.name as customer_name, c.phone as customer_phone,
                  c.email as customer_email, c.address as customer_address,
@@ -57,7 +56,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   try {
     const body = await req.json();
     const { status, notes, scheduled_date, scheduled_time, assigned_to } = body;
-    const sql = neon(DB);
+    const sql = neon(DB_URL);
 
     const completedAt = status === "COMPLETED" ? new Date().toISOString() : null;
 
@@ -96,7 +95,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   if (!["ADMIN", "MANAGER"].includes(userRole)) return NextResponse.json({ detail: "Not authorized" }, { status: 403 });
   const { id } = await params;
   try {
-    const sql = neon(DB);
+    const sql = neon(DB_URL);
     await sql`UPDATE orders SET is_deleted = true, updated_at = NOW() WHERE id = ${id}::uuid`;
     return NextResponse.json({ detail: "Deleted" });
   } catch (err) { console.error(err); return NextResponse.json({ detail: "Failed to delete" }, { status: 500 }); }

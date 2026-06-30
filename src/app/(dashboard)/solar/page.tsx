@@ -1,5 +1,6 @@
 "use client";
 import { API_BASE } from "@/lib/backend";
+import Link from "next/link";
 
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth-store";
@@ -25,7 +26,7 @@ interface Order {
   scheduled_date: string | null;
   total_amount: number;
   customer_name: string;
-  customer_city: string;
+  customer_address: string;
 }
 
 interface Stats {
@@ -188,9 +189,9 @@ export default function SolarPage() {
                       <p className="font-medium">
                         {order.customer_name ?? "—"}
                       </p>
-                      {order.customer_city && (
+                      {order.customer_address && (
                         <p className="text-xs text-muted-foreground">
-                          {order.customer_city}
+                          {order.customer_address}
                         </p>
                       )}
                     </div>
@@ -208,10 +209,10 @@ export default function SolarPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="sm" asChild>
-                      <a href={`/orders/${order.id}`}>
+                      <Link href={`/orders/${order.id}`}>
                         <Eye className="h-4 w-4 mr-1" />
                         View
-                      </a>
+                      </Link>
                     </Button>
                   </TableCell>
                 </TableRow>

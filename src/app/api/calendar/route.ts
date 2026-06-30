@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
         AND o.status NOT IN ('CANCELLED', 'COMPLETED')
       ORDER BY o.scheduled_date ASC, o.scheduled_time ASC NULLS LAST
     `;
-    return NextResponse.json({ events });
+    return NextResponse.json({ jobs: events });
   } catch (err) {
     console.error("[Calendar API]", err);
     return NextResponse.json({ detail: "Failed to load calendar" }, { status: 500 });
