@@ -106,21 +106,49 @@ export async function POST(req: NextRequest) {
     const tax_amount = parseFloat((taxable * taxRate / 100).toFixed(2));
     const total_amount = parseFloat((taxable + tax_amount).toFixed(2));
 
+    // Safe UUID helper — avoids null::uuid cast errors in PostgreSQL
+    const safeUUID = (v: string | null | undefined) => (v && v.trim() ? v.trim() : null);
+
     const orderRows = await sql`
-      INSERT INTO orders(id,order_number,customer_id,service_type,status,scheduled_date,scheduled_time,subtotal,discount,tax_rate,tax_amount,total_amount,notes,assigned_to,created_by,is_deleted)
-      VALUES(gen_random_uuid(),${order_number},${customer_id}::uuid,${service_type},'PENDING',${scheduled_date||null},${scheduled_time||null},${sub},${disc},${taxRate},${tax_amount},${total_amount},${notes||null},${assigned_to||null}::uuid,${userId}::uuid,false)
-      RETURNING id,order_number,service_type,status,scheduled_date,scheduled_time,subtotal,discount,tax_rate,tax_amount,total_amount,notes,customer_id,created_at
+      INSERT INTO orders(
+        id, order_number, customer_id, service_type, status,
+        scheduled_date, scheduled_time, subtotal, discount, tax_rate,
+        tax_amount, total_amount, notes, assigned_to, created_by, is_deleted
+      )
+      VALUES(
+        gen_random_uuid(),
+        ${order_number},
+        ${safeUUID(customer_id)}::uuid,
+        ${service_type},
+        'PENDING',
+        ${scheduled_date || null},
+        ${scheduled_time || null},
+        ${sub},
+        ${disc},
+        ${taxRate},
+        ${tax_amount},
+        ${total_amount},
+        ${notes || null},
+        ${safeUUID(assigned_to)},
+        ${safeUUID(userId)}::uuid,
+        false
+      )
+      RETURNING id, order_number, service_type, status, scheduled_date,
+                scheduled_time, subtotal, discount, tax_rate, tax_amount,
+                total_amount, notes, customer_id, created_at
     `;
+
 
     const order = orderRows[0];
 
+    // Insert service details — silently ignore if detail tables don't exist yet
     if (service_type === "SOLAR" && solar_detail) {
       const { panel_count, capacity_kw, roof_type, panel_type, remarks } = solar_detail;
-      await sql`INSERT INTO solar_cleaning_details(id,order_id,panel_count,capacity_kw,roof_type,panel_type,remarks) VALUES(gen_random_uuid(),${order.id}::uuid,${panel_count||0},${capacity_kw||0},${roof_type||'FLAT'},${panel_type||'MONOCRYSTALLINE'},${remarks||null})`;
+      await sql`INSERT INTO solar_cleaning_details(id,order_id,panel_count,capacity_kw,roof_type,panel_type,remarks) VALUES(gen_random_uuid(),${order.id}::uuid,${panel_count||0},${capacity_kw||0},${roof_type||'FLAT'},${panel_type||'MONOCRYSTALLINE'},${remarks||null})`.catch(() => {});
     }
     if ((service_type === "TANK" || service_type === "COMBINED") && tank_detail) {
       const { tank_type, capacity_liters, number_of_tanks, chemical_used, remarks } = tank_detail;
-      await sql`INSERT INTO tank_cleaning_details(id,order_id,tank_type,capacity_liters,number_of_tanks,chemical_used,remarks) VALUES(gen_random_uuid(),${order.id}::uuid,${tank_type||'OVERHEAD'},${capacity_liters||0},${number_of_tanks||1},${chemical_used||null},${remarks||null})`;
+      await sql`INSERT INTO tank_cleaning_details(id,order_id,tank_type,capacity_liters,number_of_tanks,chemical_used,remarks) VALUES(gen_random_uuid(),${order.id}::uuid,${tank_type||'OVERHEAD'},${capacity_liters||0},${number_of_tanks||1},${chemical_used||null},${remarks||null})`.catch(() => {});
     }
 
     await sql`INSERT INTO activity_logs(id,order_id,user_id,action,details,entity_type,entity_id) VALUES(gen_random_uuid(),${order.id}::uuid,${userId}::uuid,'ORDER_CREATED','Order created','order',${order.id})`.catch(()=>{});
@@ -128,6 +156,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ...order, total_amount: Number(order.total_amount) }, { status: 201 });
   } catch (err: any) {
     console.error("[Orders POST]", err);
-    return NextResponse.json({ detail: "Failed to create order" }, { status: 500 });
+    return NextResponse.json({ detail: err?.message || "Failed to create order" }, { status: 500 });
   }
 }
