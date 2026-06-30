@@ -61,8 +61,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
         longitude = ${longitude || null},
         maps_url = ${maps_url || null},
         gst_number = ${gst_number || null},
-        property_type = COALESCE(${property_type || null}, property_type),
-        lead_source = COALESCE(${lead_source || null}, lead_source),
+        property_type = COALESCE(${property_type || null}::text, property_type::text)::propertytypenum,
+        lead_source = COALESCE(${lead_source || null}::text, lead_source::text)::leadsourceenum,
         notes = ${notes || null},
         updated_at = NOW()
       WHERE id = ${id}::uuid AND is_deleted = false
@@ -74,6 +74,10 @@ export async function PUT(req: NextRequest, { params }: Params) {
     return NextResponse.json({ ...rows[0], total_orders: 0, total_spent: 0 });
   } catch (err) { console.error(err); return NextResponse.json({ detail: "Failed to update" }, { status: 500 }); }
 }
+
+// PATCH /api/customers/[id] — alias for PUT
+export const PATCH = PUT;
+
 
 // DELETE /api/customers/[id]
 export async function DELETE(req: NextRequest, { params }: Params) {
