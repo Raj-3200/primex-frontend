@@ -78,6 +78,9 @@ export async function GET(req: NextRequest) {
       if (r.service_type === "COMBINED") dist.combined = r.count;
     });
 
+    const serviceLabel = (t: string) =>
+      t === "SOLAR" ? "☀️ Solar Cleaning" : t === "TANK" ? "💧 Tank Cleaning" : "🔧 AMC Service";
+
     return NextResponse.json({
       stats: {
         today_revenue: Number(s.today_revenue),
@@ -89,10 +92,21 @@ export async function GET(req: NextRequest) {
         total_customers: s.total_customers,
         new_customers_this_month: s.new_customers_this_month,
       },
-      revenue_chart: revenueChart.map((r: any) => ({ month: r.month, revenue: Number(r.revenue), orders: r.orders })),
+      revenue_chart: revenueChart.map((r: any) => ({
+        month: r.month,
+        revenue: Number(r.revenue),
+        profit: Math.round(Number(r.revenue) * 0.35), // ~35% margin estimate
+        orders: r.orders,
+      })),
       service_distribution: dist,
       upcoming_jobs: upcomingJobs.map((j: any) => ({ ...j, total_amount: Number(j.total_amount) })),
-      recent_activity: recentActivity.map((a: any) => ({ ...a, total_amount: Number(a.total_amount) })),
+      recent_activity: recentActivity.map((a: any) => ({
+        id: a.id,
+        title: `${serviceLabel(a.service_type)} — ${a.customer_name}`,
+        description: `${a.order_number} · ₹${Number(a.total_amount).toLocaleString("en-IN")}`,
+        time: new Date(a.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
+        status: a.status,
+      })),
     });
   } catch (err) {
     console.error("[Dashboard]", err);
