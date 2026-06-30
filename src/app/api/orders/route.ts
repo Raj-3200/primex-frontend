@@ -95,9 +95,18 @@ export async function POST(req: NextRequest) {
     if (!service_type) return NextResponse.json({ detail: "Service type is required" }, { status: 400 });
 
     const sql = neon(DB_URL);
-    const countRow = await sql`SELECT COUNT(*)::int AS cnt FROM orders WHERE is_deleted=false`;
-    const num = String((countRow[0]?.cnt ?? 0) + 1).padStart(4, "0");
-    const order_number = `PX-${new Date().getFullYear()}-${num}`;
+    const year = new Date().getFullYear();
+    const likePattern = `PX-${year}-%`;
+    const maxRow = await sql`
+      SELECT COALESCE(
+        MAX(CAST(SPLIT_PART(order_number, '-', 3) AS INTEGER)),
+        0
+      ) AS max_num
+      FROM orders
+      WHERE order_number LIKE ${likePattern}
+    `;
+    const nextNum = (maxRow[0]?.max_num ?? 0) + 1;
+    const order_number = `PX-${year}-${String(nextNum).padStart(4, '0')}`;
 
     const sub = Number(subtotal) || 0;
     const disc = Number(discount) || 0;

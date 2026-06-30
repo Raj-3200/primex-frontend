@@ -19,23 +19,26 @@ export async function GET(req: NextRequest, { params }: Params) {
   const { id } = await params;
   try {
     const sql = neon(DB);
-    const [orders, solar, tank, logs] = await Promise.all([
-      sql`SELECT o.*, c.name as customer_name, c.phone as customer_phone,
+    const orders = await sql`
+      SELECT o.*, c.name as customer_name, c.phone as customer_phone,
                  c.email as customer_email, c.address as customer_address,
                  c.customer_id as customer_code,
                  u.full_name as assigned_name, cb.full_name as created_by_name
-          FROM orders o
-          JOIN customers c ON c.id = o.customer_id
-          LEFT JOIN users u ON u.id = o.assigned_to
-          LEFT JOIN users cb ON cb.id = o.created_by
-          WHERE o.id = ${id}::uuid AND o.is_deleted = false LIMIT 1`,
-      sql`SELECT * FROM solar_cleaning_details WHERE order_id = ${id}::uuid LIMIT 1`,
-      sql`SELECT * FROM tank_cleaning_details WHERE order_id = ${id}::uuid LIMIT 1`,
-      sql`SELECT al.*, u.full_name FROM activity_logs al
-          LEFT JOIN users u ON u.id = al.user_id
-          WHERE al.order_id = ${id}::uuid ORDER BY al.created_at DESC LIMIT 20`,
-    ]);
+      FROM orders o
+      JOIN customers c ON c.id = o.customer_id
+      LEFT JOIN users u ON u.id = o.assigned_to
+      LEFT JOIN users cb ON cb.id = o.created_by
+      WHERE o.id = ${id}::uuid AND o.is_deleted = false LIMIT 1
+    `;
     if (!orders[0]) return NextResponse.json({ detail: "Not found" }, { status: 404 });
+
+    // These tables may not exist yet — return null/[] gracefully
+    const [solar, tank, logs] = await Promise.all([
+      sql`SELECT * FROM solar_cleaning_details WHERE order_id = ${id}::uuid LIMIT 1`.catch(() => []),
+      sql`SELECT * FROM tank_cleaning_details WHERE order_id = ${id}::uuid LIMIT 1`.catch(() => []),
+      sql`SELECT al.*, u.full_name FROM activity_logs al LEFT JOIN users u ON u.id = al.user_id WHERE al.order_id = ${id}::uuid ORDER BY al.created_at DESC LIMIT 20`.catch(() => []),
+    ]);
+
     const o = orders[0];
     return NextResponse.json({
       order: { ...o, total_amount: Number(o.total_amount), subtotal: Number(o.subtotal), discount: Number(o.discount), tax_amount: Number(o.tax_amount) },
