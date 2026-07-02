@@ -1,5 +1,4 @@
 "use client";
-import { API_BASE } from "@/lib/backend";
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";

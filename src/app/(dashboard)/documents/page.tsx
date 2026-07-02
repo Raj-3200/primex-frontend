@@ -122,7 +122,7 @@ export default function DocumentsPage() {
                       <Link href={`/orders/${order.id}`}><Eye className="w-3 h-3 mr-1" />View Report</Link>
                     </Button>
                     <Button variant="ghost" size="sm" className="text-xs h-8 rounded-lg px-2" title="Download">
-                      <FileText className="w-3 h-3" />
+                      <FileText className="w-3 h-3" onClick={() => window.print()} />
                     </Button>
                   </div>
                 </Card>

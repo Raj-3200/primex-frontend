@@ -35,6 +35,8 @@ import {
   subMonths,
   parseISO,
 } from "date-fns";
+import { getJobGroup, sortJobsBySchedule, toDateKey } from "@/lib/business";
+import { Badge } from "@/components/ui/badge";
 
 interface CalendarJob {
   id: string;
@@ -174,10 +176,11 @@ export default function CalendarPage() {
     const map = new Map<string, CalendarJob[]>();
     for (const job of jobs) {
       if (!job.scheduled_date) continue;
-      const key = job.scheduled_date;
+      const key = toDateKey(job.scheduled_date);
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(job);
     }
+    for (const [key, value] of map) map.set(key, sortJobsBySchedule(value));
     return map;
   }, [jobs]);
 
@@ -191,15 +194,16 @@ export default function CalendarPage() {
   // Jobs for selected date or upcoming jobs
   const selectedJobs = useMemo(() => {
     if (!selectedDate) return [];
-    const key = format(selectedDate, "yyyy-MM-dd");
+    const key = toDateKey(selectedDate);
     return jobsByDate.get(key) || [];
   }, [selectedDate, jobsByDate]);
 
   // Upcoming jobs (next 30 days)
   const upcomingJobs = useMemo(() => {
-    const today = format(new Date(), "yyyy-MM-dd");
+    const today = toDateKey(new Date());
     return jobs
-      .filter((j) => j.scheduled_date && j.scheduled_date >= today)
+      .filter((j) => toDateKey(j.scheduled_date) >= today && j.status !== "CANCELLED")
+      .sort((a, b) => sortJobsBySchedule([a, b])[0].id === a.id ? -1 : 1)
       .slice(0, 15);
   }, [jobs]);
 
@@ -292,7 +296,7 @@ export default function CalendarPage() {
         ) : (
           <div className="grid grid-cols-7">
             {calendarDays.map((date) => {
-              const key = format(date, "yyyy-MM-dd");
+              const key = toDateKey(date);
               const dayJobs = jobsByDate.get(key) || [];
               const isSelected =
                 selectedDate ? isSameDay(date, selectedDate) : false;
@@ -392,6 +396,9 @@ export default function CalendarPage() {
                         {job.order_number}
                       </Link>
                       <StatusBadge status={job.status} showDot={false} />
+                      {getJobGroup(job) === "needs_confirmation" && (
+                        <Badge className="bg-red-100 text-red-700 border-0 text-[10px]">Needs Confirmation</Badge>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 mt-0.5">
                       <span className="flex items-center gap-1 text-xs text-muted-foreground">

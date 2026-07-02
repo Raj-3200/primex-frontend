@@ -2,6 +2,7 @@
 import { API_BASE } from "@/lib/backend";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { Bell, BellOff, CheckCheck, Circle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -219,6 +220,11 @@ export default function NotificationsPage() {
                       >
                         Mark read
                       </button>
+                    )}
+                    {notif.action_url && (
+                      <Button asChild variant="outline" size="sm" className="h-8 text-xs">
+                        <Link href={notif.action_url}>Open</Link>
+                      </Button>
                     )}
                   </div>
                 </div>

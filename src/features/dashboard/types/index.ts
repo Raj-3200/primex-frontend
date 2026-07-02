@@ -3,6 +3,9 @@ export interface DashboardStats {
   monthly_revenue: number;
   yearly_revenue: number;
   total_outstanding: number;
+  total_billed?: number;
+  expenses?: number;
+  profit?: number;
   today_jobs: number;
   upcoming_jobs: number;
   total_customers: number;
@@ -34,6 +37,7 @@ export interface UpcomingJob {
   order_number: string;
   customer_name: string;
   customer_phone?: string;
+  customer_address?: string;
   service_type: string;
   scheduled_date: string;
   scheduled_time: string | null;
@@ -63,5 +67,6 @@ export interface DashboardData {
   revenue_chart: RevenueDataPoint[];
   service_distribution: ServiceDistribution;
   upcoming_jobs: UpcomingJob[];
+  needs_confirmation?: UpcomingJob[];
   recent_activity: RecentActivity[];
 }

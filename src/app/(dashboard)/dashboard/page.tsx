@@ -12,6 +12,8 @@ import {
   ArrowRight,
   Clock,
   Activity,
+  MessageCircle,
+  Phone,
 } from "lucide-react";
 import {
   AreaChart,
@@ -36,6 +38,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import Link from "next/link";
+import { getWhatsAppUrl } from "@/lib/business";
+import { useUpdateOrderStatus } from "@/features/orders/hooks/use-orders";
 
 // ── Skeleton loader for the dashboard ─────────────────────────────────────
 function DashboardSkeleton() {
@@ -73,6 +77,7 @@ const PIE_COLORS = ["#E8722A", "#3B82F6", "#22C55E"];
 
 export default function DashboardPage() {
   const { data, isLoading, isError } = useDashboard();
+  const { mutate: updateOrderStatus, isPending: isUpdatingOrder } = useUpdateOrderStatus();
 
   if (isLoading) return <DashboardSkeleton />;
 
@@ -89,7 +94,7 @@ export default function DashboardPage() {
     );
   }
 
-  const { stats, revenue_chart, service_distribution, upcoming_jobs, recent_activity } =
+  const { stats, revenue_chart, service_distribution, upcoming_jobs, needs_confirmation = [], recent_activity } =
     data!;
 
   const pieData = [
@@ -122,6 +127,92 @@ export default function DashboardPage() {
         </Button>
       </div>
 
+      {needs_confirmation.length > 0 && (
+        <Card className="p-5 rounded-2xl border-red-200 bg-red-50/70 shadow-sm">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-base font-bold text-red-950 font-display">Job Completion Check</h2>
+              <p className="text-sm text-red-700">These scheduled job times have passed. Confirm what happened before they slip from view.</p>
+            </div>
+            <Button asChild variant="outline" size="sm" className="bg-white">
+              <Link href="/orders?group=needs_confirmation">Review all</Link>
+            </Button>
+          </div>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+            {needs_confirmation.map((job) => {
+              const message = `Hello ${job.customer_name}, this is PrimeX Services. We are checking your ${job.service_type.toLowerCase()} service scheduled on ${formatDate(job.scheduled_date)}${job.scheduled_time ? ` at ${job.scheduled_time}` : ""}. Please confirm if everything was completed.`;
+              return (
+                <div key={job.id} className="rounded-xl border border-red-200 bg-white p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <Link href={`/orders/${job.id}`} className="font-mono text-sm font-semibold text-primary hover:underline">
+                        {job.order_number}
+                      </Link>
+                      <p className="font-semibold truncate">{job.customer_name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{job.customer_address || "Address not added"}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {formatDate(job.scheduled_date)}{job.scheduled_time ? ` · ${job.scheduled_time}` : ""} · {formatCurrency(job.total_amount ?? 0)}
+                      </p>
+                    </div>
+                    <StatusBadge status="PENDING" showDot={false} className="bg-red-100 text-red-700 border-red-200" />
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-4">
+                    <Button asChild variant="outline" size="sm">
+                      <a href={`tel:${job.customer_phone || ""}`}><Phone className="w-3.5 h-3.5 mr-1" />Call</a>
+                    </Button>
+                    <Button asChild variant="outline" size="sm">
+                      <a href={getWhatsAppUrl(job.customer_phone, message)} target="_blank" rel="noreferrer"><MessageCircle className="w-3.5 h-3.5 mr-1" />WhatsApp</a>
+                    </Button>
+                    <Button
+                      size="sm"
+                      disabled={isUpdatingOrder}
+                      onClick={() => updateOrderStatus({ id: job.id, status: "COMPLETED", notes: "Marked completed from dashboard action center" })}
+                    >
+                      Mark Completed
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={isUpdatingOrder}
+                      onClick={() => updateOrderStatus({ id: job.id, status: "CANCELLED", notes: "Cancelled from dashboard action center" })}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
+      <Card className="p-5 rounded-2xl border-border shadow-sm">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div>
+            <h2 className="text-base font-bold text-foreground font-display">Today's Action Center</h2>
+            <p className="text-sm text-muted-foreground">Jobs, payments, and follow-ups that need attention first.</p>
+          </div>
+          <div className="flex gap-2">
+            <Button asChild variant="outline" size="sm"><Link href="/payments">Record Payment</Link></Button>
+            <Button asChild variant="outline" size="sm"><Link href="/expenses">Add Expense</Link></Button>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="rounded-xl border border-border p-4">
+            <p className="text-xs text-muted-foreground">Needs Confirmation</p>
+            <p className="text-2xl font-bold text-red-600">{needs_confirmation.length}</p>
+          </div>
+          <div className="rounded-xl border border-border p-4">
+            <p className="text-xs text-muted-foreground">Today's Jobs</p>
+            <p className="text-2xl font-bold">{stats.today_jobs}</p>
+          </div>
+          <div className="rounded-xl border border-border p-4">
+            <p className="text-xs text-muted-foreground">Unpaid Invoices</p>
+            <p className="text-2xl font-bold">{formatCurrency(stats.total_outstanding)}</p>
+          </div>
+        </div>
+      </Card>
+
       {/* ── Stats Grid (8 cards) ────────────────────────────────────── */}
       <motion.div
         initial="hidden"
@@ -134,28 +225,28 @@ export default function DashboardPage() {
       >
         {[
           {
-            title: "Today's Revenue",
+            title: "Collected Today",
             value: stats.today_revenue,
             icon: IndianRupee,
             variant: "orange" as const,
             format: "currency" as const,
           },
           {
-            title: "Monthly Revenue",
+            title: "Collected This Month",
             value: stats.monthly_revenue,
             icon: TrendingUp,
             variant: "amber" as const,
             format: "currency" as const,
           },
           {
-            title: "Yearly Revenue",
+            title: "Collected This Year",
             value: stats.yearly_revenue,
             icon: IndianRupee,
             variant: "green" as const,
             format: "currency" as const,
           },
           {
-            title: "Outstanding",
+            title: "Unpaid Invoices",
             value: stats.total_outstanding,
             icon: IndianRupee,
             variant: "blue" as const,
@@ -209,7 +300,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-base font-bold text-foreground font-display">
-                Revenue Overview
+                Collections Overview
               </h2>
               <p className="text-xs text-muted-foreground">Last 12 months</p>
             </div>

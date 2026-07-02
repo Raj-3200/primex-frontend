@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Bell, Moon, Search, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { motion } from "framer-motion";
@@ -9,11 +11,20 @@ import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useSidebarStore } from "@/stores/sidebar-store";
 import { Menu } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
+
+interface SearchResult {
+  id: string;
+  type: string;
+  title: string;
+  detail: string;
+  href: string;
+}
 
 interface HeaderProps {
   title?: string;
@@ -23,6 +34,35 @@ export function Header({ title }: HeaderProps) {
   const { theme, setTheme } = useTheme();
   const { toggleMobile } = useSidebarStore();
   const { user } = useAuthStore();
+  const [search, setSearch] = useState("");
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const trimmedSearch = useMemo(() => search.trim(), [search]);
+
+  useEffect(() => {
+    if (trimmedSearch.length < 2) {
+      setResults([]);
+      setSearchOpen(false);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      const token = localStorage.getItem("access_token") || "";
+      const response = await fetch(`/api/search?q=${encodeURIComponent(trimmedSearch)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      }).catch(() => null);
+      if (!response?.ok) return;
+      const data = await response.json();
+      setResults(data.results ?? []);
+      setSearchOpen(true);
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [trimmedSearch]);
 
   return (
     <motion.header
@@ -52,9 +92,37 @@ export function Header({ title }: HeaderProps) {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Search customers, orders..."
+            placeholder="Search customers, phone, orders..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            onFocus={() => setSearchOpen(results.length > 0)}
             className="pl-9 h-9 bg-muted/50 border-muted focus:bg-background text-sm"
           />
+          {searchOpen && (
+            <div className="absolute left-0 right-0 top-11 rounded-xl border border-border bg-popover shadow-premium overflow-hidden z-50">
+              {results.length === 0 ? (
+                <div className="px-4 py-3 text-sm text-muted-foreground">No matching records</div>
+              ) : (
+                results.map((result) => (
+                  <Link
+                    key={`${result.type}-${result.id}`}
+                    href={result.href}
+                    onClick={() => {
+                      setSearch("");
+                      setSearchOpen(false);
+                    }}
+                    className="block px-4 py-3 hover:bg-muted/60"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-medium truncate">{result.title}</p>
+                      <Badge variant="outline" className="text-[10px]">{result.type}</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">{result.detail}</p>
+                  </Link>
+                ))
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -94,9 +162,9 @@ export function Header({ title }: HeaderProps) {
             <div className="p-3 border-b">
               <p className="font-semibold text-sm">Notifications</p>
             </div>
-            <div className="p-6 text-center text-sm text-muted-foreground">
-              No new notifications
-            </div>
+            <DropdownMenuItem asChild>
+              <Link href="/notifications" className="cursor-pointer">Open notification center</Link>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 

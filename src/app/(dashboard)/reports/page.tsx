@@ -8,9 +8,11 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from "recharts";
 import { BarChart3, IndianRupee, ShoppingBag, Users, TrendingUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency } from "@/lib/utils";
+import { downloadCsv } from "@/lib/business";
 
 const PIE_COLORS = ["#E8722A", "#3B82F6", "#22C55E"];
 
@@ -54,10 +56,10 @@ export default function ReportsPage() {
     </div>
   );
 
-  const { monthly_revenue = [], top_customers = [], service_breakdown = [], status_breakdown = [] } = data;
+  const { monthly_revenue = [], top_customers = [], service_breakdown = [], status_breakdown = [], finance } = data;
 
   // Compute summary from data
-  const totalRevenue = monthly_revenue.reduce((s: number, r: any) => s + r.revenue, 0);
+  const totalRevenue = finance?.collected ?? monthly_revenue.reduce((s: number, r: any) => s + r.revenue, 0);
   const totalOrders = status_breakdown.reduce((s: number, r: any) => s + r.count, 0);
   const totalCustomers = top_customers.length;
   const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
@@ -75,8 +77,22 @@ export default function ReportsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-foreground font-display">Reports & Analytics</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Business intelligence overview</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground font-display">Reports & Analytics</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Collected money, unpaid invoices, expenses, and profit</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => downloadCsv("primex-business-summary.csv", [
+              { metric: "Billed", value: finance?.billed ?? 0 },
+              { metric: "Collected", value: finance?.collected ?? 0 },
+              { metric: "Unpaid invoices", value: finance?.outstanding ?? 0 },
+              { metric: "Expenses", value: finance?.expenses ?? 0 },
+              { metric: "Profit", value: finance?.profit ?? 0 },
+            ])}>Export CSV</Button>
+            <Button variant="outline" size="sm" onClick={() => window.print()}>Print</Button>
+          </div>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -85,9 +101,9 @@ export default function ReportsPage() {
         variants={{ visible: { transition: { staggerChildren: 0.06 } }, hidden: {} }}>
         {[
           { label: "Total Revenue", value: formatCurrency(totalRevenue), icon: IndianRupee, color: "text-primary" },
-          { label: "Total Orders", value: String(totalOrders), icon: ShoppingBag, color: "text-blue-500" },
-          { label: "Top Customers", value: String(totalCustomers), icon: Users, color: "text-green-500" },
-          { label: "Avg Order Value", value: formatCurrency(avgOrderValue), icon: TrendingUp, color: "text-purple-500" },
+          { label: "Unpaid Invoices", value: formatCurrency(finance?.outstanding ?? 0), icon: ShoppingBag, color: "text-blue-500" },
+          { label: "Expenses", value: formatCurrency(finance?.expenses ?? 0), icon: Users, color: "text-red-500" },
+          { label: "Estimated Profit", value: formatCurrency(finance?.profit ?? avgOrderValue), icon: TrendingUp, color: "text-green-500" },
         ].map((card) => (
           <motion.div key={card.label} variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }}>
             <Card className="p-5 rounded-2xl">
@@ -158,7 +174,7 @@ export default function ReportsPage() {
                 <div key={c.id} className="flex items-center gap-3">
                   <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0">{i + 1}</span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{c.name}</p>
+                    <p className="text-sm font-medium truncate">{c.name || c.customer_name}</p>
                     <p className="text-xs text-muted-foreground">{c.order_count} orders</p>
                   </div>
                   <p className="text-sm font-semibold text-primary">{formatCurrency(c.total_revenue)}</p>

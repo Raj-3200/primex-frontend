@@ -5,10 +5,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import {
   Plus, Search, ShoppingBag, Sun, Droplets, Filter,
-  ChevronDown, MoreHorizontal, CheckCircle,
+  ChevronDown, MoreHorizontal, CheckCircle, MessageCircle, Download,
 } from "lucide-react";
 
-import { useOrders, useUpdateOrderStatus, useDeleteOrder } from "@/features/orders/hooks/use-orders";
+import { useOrders, useUpdateOrder, useUpdateOrderStatus, useDeleteOrder } from "@/features/orders/hooks/use-orders";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { downloadCsv, getJobGroup, getWhatsAppUrl, sortJobsBySchedule, type JobGroup } from "@/lib/business";
 import type { Order } from "@/features/orders/types";
 
 const STATUS_FLOW: Record<string, string[]> = {
@@ -36,9 +37,27 @@ const STATUS_FLOW: Record<string, string[]> = {
 
 function OrderRow({ order }: { order: Order }) {
   const { mutate: updateStatus } = useUpdateOrderStatus();
+  const { mutate: updateOrder } = useUpdateOrder();
   const { mutate: deleteOrder } = useDeleteOrder();
 
   const nextStatuses = STATUS_FLOW[order.status] ?? [];
+  const group = getJobGroup(order);
+  const reminder = `Hello ${order.customer_name}, this is PrimeX Services. Your ${order.service_type.toLowerCase()} job ${order.order_number} is scheduled for ${order.scheduled_date ? formatDate(order.scheduled_date) : "the planned date"}${order.scheduled_time ? ` at ${order.scheduled_time}` : ""}.`;
+
+  const handleReschedule = () => {
+    const newDate = window.prompt("New scheduled date (YYYY-MM-DD)", order.scheduled_date?.slice(0, 10) || "");
+    if (!newDate) return;
+    const newTime = window.prompt("New scheduled time (HH:mm)", order.scheduled_time || "09:00");
+    updateOrder({
+      id: order.id,
+      payload: {
+        scheduled_date: newDate,
+        scheduled_time: newTime || order.scheduled_time,
+        status: "SCHEDULED",
+        notes: `Rescheduled from orders workflow to ${newDate} ${newTime || ""}`,
+      },
+    });
+  };
 
   return (
     <motion.tr
@@ -74,7 +93,12 @@ function OrderRow({ order }: { order: Order }) {
         </div>
       </td>
       <td className="py-3 px-4">
-        <StatusBadge status={order.status} />
+        <div className="flex flex-col gap-1 items-start">
+          <StatusBadge status={order.status} />
+          {group === "needs_confirmation" && (
+            <Badge className="bg-red-100 text-red-700 border-0 text-[10px]">Needs Confirmation</Badge>
+          )}
+        </div>
       </td>
       <td className="py-3 px-4">
         <span className="text-sm text-muted-foreground">
@@ -101,6 +125,14 @@ function OrderRow({ order }: { order: Order }) {
             <DropdownMenuItem asChild>
               <Link href={`/orders/${order.id}`}>View Details</Link>
             </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <a href={getWhatsAppUrl((order as any).customer_phone, reminder)} target="_blank" rel="noreferrer">
+                <MessageCircle className="h-4 w-4 mr-2" />WhatsApp Reminder
+              </a>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleReschedule}>
+              Reschedule
+            </DropdownMenuItem>
             {nextStatuses.length > 0 && (
               <>
                 <DropdownMenuSeparator />
@@ -116,8 +148,15 @@ function OrderRow({ order }: { order: Order }) {
             )}
             <DropdownMenuSeparator />
             <DropdownMenuItem
+              onClick={() => updateStatus({ id: order.id, status: "PENDING", notes: "Kept pending from smart workflow" })}
+            >
+              Keep Pending
+            </DropdownMenuItem>
+            <DropdownMenuItem
               className="text-destructive"
-              onClick={() => deleteOrder(order.id)}
+              onClick={() => {
+                if (window.confirm("Delete this order from active records?")) deleteOrder(order.id);
+              }}
             >
               Delete
             </DropdownMenuItem>
@@ -132,6 +171,7 @@ export default function OrdersPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [serviceType, setServiceType] = useState("");
+  const [group, setGroup] = useState<JobGroup | "all">("all");
   const [page, setPage] = useState(1);
 
   const { data, isLoading } = useOrders({
@@ -141,6 +181,19 @@ export default function OrdersPage() {
     status: status || undefined,
     service_type: serviceType || undefined,
   });
+
+  const visibleOrders = sortJobsBySchedule(data?.items ?? [])
+    .filter((order) => group === "all" || getJobGroup(order) === group)
+    .sort((a, b) => {
+      const priority: Record<JobGroup, number> = {
+        needs_confirmation: 0,
+        today: 1,
+        upcoming: 2,
+        completed: 3,
+        cancelled: 4,
+      };
+      return priority[getJobGroup(a)] - priority[getJobGroup(b)];
+    });
 
   return (
     <div className="space-y-6">
@@ -152,12 +205,49 @@ export default function OrdersPage() {
             {data ? `${data.total} total orders` : "Loading…"}
           </p>
         </div>
-        <Button asChild className="shadow-premium">
-          <Link href="/orders/new">
-            <Plus className="w-4 h-4 mr-2" />
-            New Order
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => downloadCsv("primex-orders.csv", visibleOrders.map((order) => ({
+              order_number: order.order_number,
+              customer: order.customer_name,
+              service: order.service_type,
+              status: order.status,
+              group: getJobGroup(order),
+              scheduled_date: order.scheduled_date,
+              amount: order.total_amount,
+            })))}
+          >
+            <Download className="w-4 h-4 mr-2" />Export
+          </Button>
+          <Button asChild className="shadow-premium">
+            <Link href="/orders/new">
+              <Plus className="w-4 h-4 mr-2" />
+              New Order
+            </Link>
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {[
+          ["all", "All"],
+          ["upcoming", "Upcoming"],
+          ["today", "Today"],
+          ["needs_confirmation", "Needs Confirmation"],
+          ["completed", "Completed"],
+          ["cancelled", "Cancelled"],
+        ].map(([key, label]) => (
+          <Button
+            key={key}
+            type="button"
+            size="sm"
+            variant={group === key ? "default" : "outline"}
+            onClick={() => setGroup(key as JobGroup | "all")}
+          >
+            {label}
+          </Button>
+        ))}
       </div>
 
       {/* Filters */}
@@ -221,13 +311,13 @@ export default function OrdersPage() {
                       ))}
                     </tr>
                   ))
-                : data?.items.map((order) => (
+                : visibleOrders.map((order) => (
                     <OrderRow key={order.id} order={order} />
                   ))}
             </tbody>
           </table>
 
-          {!isLoading && !data?.items.length && (
+          {!isLoading && !visibleOrders.length && (
             <EmptyState
               title="No orders found"
               description={search ? "No orders match your search." : "Create your first order to get started."}

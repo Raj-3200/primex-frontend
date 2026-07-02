@@ -61,7 +61,7 @@ export async function updateOrderStatus(id: string, status: string, notes?: stri
   return handleResponse<Order>(res);
 }
 
-export async function updateOrder(id: string, payload: Partial<Order>): Promise<Order> {
+export async function updateOrder(id: string, payload: Partial<Order> | Record<string, unknown>): Promise<Order> {
   const res = await fetch(`${BASE}/orders/${id}`, {
     method: "PATCH",
     headers: headers(),

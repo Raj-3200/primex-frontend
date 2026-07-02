@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { format, formatDistanceToNow, isToday, isYesterday } from "date-fns";
+import { toDateKey } from "@/lib/business";
 
 /** Merge Tailwind classes with clsx. */
 export function cn(...inputs: ClassValue[]) {
@@ -24,7 +25,12 @@ export function formatNumber(n: number): string {
 
 /** Smart date formatter: "Today", "Yesterday", or formatted date. */
 export function formatDate(date: string | Date): string {
-  const d = typeof date === "string" ? new Date(date) : date;
+  const d =
+    typeof date === "string" && toDateKey(date)
+      ? new Date(`${toDateKey(date)}T12:00:00`)
+      : typeof date === "string"
+        ? new Date(date)
+        : date;
   if (isToday(d)) return "Today";
   if (isYesterday(d)) return "Yesterday";
   return format(d, "d MMM yyyy");

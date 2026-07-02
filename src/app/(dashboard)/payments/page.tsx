@@ -27,6 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { QueryError } from "@/components/ui/error-boundary";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { downloadCsv } from "@/lib/business";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type PaymentMethod = "CASH" | "UPI" | "BANK" | "CHEQUE";
@@ -191,7 +192,6 @@ function RecordPaymentDialog({ open, onClose }: { open: boolean; onClose: () => 
 export default function PaymentsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [methodFilter, setMethodFilter] = useState("ALL");
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["payments"],
@@ -255,8 +255,19 @@ export default function PaymentsPage() {
           <p className="text-sm text-muted-foreground mt-0.5">Track revenue from completed service orders</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" className="gap-2 hidden sm:flex">
-            <Download className="h-4 w-4" />Export
+          <Button
+            variant="outline"
+            className="gap-2 hidden sm:flex"
+            onClick={() => downloadCsv("primex-payments.csv", filtered.map((payment) => ({
+              order_number: payment.order_number,
+              customer: payment.customer_name,
+              service: payment.service_type,
+              amount: payment.total_amount,
+              date: payment.completed_at || payment.created_at,
+            })))}
+          >
+            <Download className="h-4 w-4" />
+            Export
           </Button>
           <Button onClick={() => setDialogOpen(true)} className="gap-2">
             <Plus className="h-4 w-4" />Record Payment

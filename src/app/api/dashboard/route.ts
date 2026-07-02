@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
     const yearStart = new Date(new Date().getFullYear(), 0, 1).toISOString().split("T")[0];
 
-    const [stats, revenueChart, serviceDistrib, upcomingJobs, recentActivity] = await Promise.all([
+    const [stats, revenueChart, serviceDistrib, upcomingJobs, needsConfirmation, recentActivity, expenseRows] = await Promise.all([
       // KPI stats
       sql`
         SELECT
@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
           COALESCE(SUM(CASE WHEN status='COMPLETED' AND completed_at >= ${monthStart}::date THEN total_amount END),0) AS monthly_revenue,
           COALESCE(SUM(CASE WHEN status='COMPLETED' AND completed_at >= ${yearStart}::date THEN total_amount END),0) AS yearly_revenue,
           COALESCE(SUM(CASE WHEN status NOT IN ('COMPLETED','CANCELLED') THEN total_amount END),0) AS total_outstanding,
+          COALESCE(SUM(total_amount),0) AS total_billed,
           COUNT(CASE WHEN DATE(scheduled_date)=CURRENT_DATE AND status NOT IN ('COMPLETED','CANCELLED') THEN 1 END)::int AS today_jobs,
           COUNT(CASE WHEN scheduled_date > CURRENT_DATE AND status NOT IN ('COMPLETED','CANCELLED') THEN 1 END)::int AS upcoming_jobs,
           (SELECT COUNT(*)::int FROM customers WHERE is_deleted=false) AS total_customers,
@@ -45,13 +46,27 @@ export async function GET(req: NextRequest) {
       `,
       // Upcoming jobs (next 7 days)
       sql`
-        SELECT o.id, o.order_number, o.service_type, o.status, o.scheduled_date, o.scheduled_time, o.total_amount,
-               c.name AS customer_name, c.phone AS customer_phone
+        SELECT o.id, o.order_number, o.service_type, o.status, o.scheduled_date::text AS scheduled_date, o.scheduled_time, o.total_amount,
+               c.name AS customer_name, c.phone AS customer_phone, c.address AS customer_address
         FROM orders o JOIN customers c ON c.id=o.customer_id
         WHERE o.is_deleted=false AND o.scheduled_date >= CURRENT_DATE
           AND o.status NOT IN ('COMPLETED','CANCELLED')
         ORDER BY o.scheduled_date ASC, o.scheduled_time ASC NULLS LAST
         LIMIT 5
+      `,
+      sql`
+        SELECT o.id, o.order_number, o.service_type, o.status, o.scheduled_date::text AS scheduled_date, o.scheduled_time, o.total_amount,
+               c.name AS customer_name, c.phone AS customer_phone, c.address AS customer_address
+        FROM orders o JOIN customers c ON c.id=o.customer_id
+        WHERE o.is_deleted=false
+          AND o.status NOT IN ('COMPLETED','CANCELLED')
+          AND o.scheduled_date IS NOT NULL
+          AND (
+            o.scheduled_date < CURRENT_DATE OR
+            (o.scheduled_date = CURRENT_DATE AND COALESCE(o.scheduled_time, '23:59'::time) < CURRENT_TIME)
+          )
+        ORDER BY o.scheduled_date ASC, o.scheduled_time ASC NULLS LAST
+        LIMIT 8
       `,
       // Recent activity (latest orders)
       sql`
@@ -61,6 +76,7 @@ export async function GET(req: NextRequest) {
         WHERE o.is_deleted=false
         ORDER BY o.created_at DESC LIMIT 8
       `,
+      sql`SELECT COALESCE(SUM(amount), 0) AS expenses FROM expenses WHERE is_deleted=false`.catch(() => [{ expenses: 0 }]),
     ]);
 
     const s = stats[0];
@@ -80,6 +96,9 @@ export async function GET(req: NextRequest) {
         monthly_revenue: Number(s.monthly_revenue),
         yearly_revenue: Number(s.yearly_revenue),
         total_outstanding: Number(s.total_outstanding),
+        total_billed: Number(s.total_billed),
+        expenses: Number(expenseRows[0]?.expenses ?? 0),
+        profit: Number(s.yearly_revenue) - Number(expenseRows[0]?.expenses ?? 0),
         today_jobs: s.today_jobs,
         upcoming_jobs: s.upcoming_jobs,
         total_customers: s.total_customers,
@@ -93,6 +112,7 @@ export async function GET(req: NextRequest) {
       })),
       service_distribution: dist,
       upcoming_jobs: upcomingJobs.map((j: any) => ({ ...j, total_amount: Number(j.total_amount) })),
+      needs_confirmation: needsConfirmation.map((j: any) => ({ ...j, total_amount: Number(j.total_amount) })),
       recent_activity: recentActivity.map((a: any) => ({
         id: a.id,
         title: `${serviceLabel(a.service_type)} — ${a.customer_name}`,

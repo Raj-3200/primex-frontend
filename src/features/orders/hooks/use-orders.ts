@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  fetchOrders, fetchOrder, createOrder, updateOrderStatus, deleteOrder,
+  fetchOrders, fetchOrder, createOrder, updateOrder, updateOrderStatus, deleteOrder,
 } from "../api/order-api";
 import type { OrderCreate } from "../types";
 import { toast } from "sonner";
@@ -53,6 +53,22 @@ export function useUpdateOrderStatus() {
       qc.invalidateQueries({ queryKey: ["order", id] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       toast.success("Order status updated");
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+}
+
+export function useUpdateOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) =>
+      updateOrder(id, payload),
+    onSuccess: (_, { id }) => {
+      qc.invalidateQueries({ queryKey: ["orders"] });
+      qc.invalidateQueries({ queryKey: ["order", id] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["calendar"] });
+      toast.success("Order updated");
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   });

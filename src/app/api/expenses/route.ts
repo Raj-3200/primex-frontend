@@ -60,7 +60,11 @@ export async function GET(req: NextRequest) {
     });
   } catch (err) {
     console.error("[Expenses GET]", err);
-    return NextResponse.json({ detail: "Failed to load expenses" }, { status: 500 });
+    return NextResponse.json({
+      expenses: [],
+      summary: { total: 0, this_month: 0 },
+      warning: "Expenses are not configured yet.",
+    });
   }
 }
 

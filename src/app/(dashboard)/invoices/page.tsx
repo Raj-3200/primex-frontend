@@ -6,6 +6,7 @@ import {
   FileText,
   XCircle,
   Download,
+  Printer,
   CheckCircle2,
   Clock,
   AlertCircle,
@@ -19,7 +20,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { downloadCsv } from '@/lib/business';
 
 function getToken() {
   if (typeof window === 'undefined') return '';
@@ -86,11 +89,27 @@ export default function InvoicesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Invoices</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          All billing records for your service orders
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Invoices</h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            All billing records for your service orders
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => downloadCsv('primex-invoices.csv', invoices.map((invoice: any) => ({
+            invoice: `INV-${invoice.order_number}`,
+            customer: invoice.customer_name,
+            service: invoice.service_type,
+            amount: invoice.total_amount,
+            status: invoice.status === 'COMPLETED' ? 'Paid' : 'Outstanding',
+          })))}>
+            <Download className="h-4 w-4 mr-1" />Export
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => window.print()}>
+            <Printer className="h-4 w-4 mr-1" />Print
+          </Button>
+        </div>
       </div>
 
       {/* Stat Cards */}

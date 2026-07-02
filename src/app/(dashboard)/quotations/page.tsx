@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import {
-  FileText, Search, Plus, Eye, IndianRupee,
+  FileText, Search, Plus, Eye, IndianRupee, Printer,
   Clock, CheckCircle2, XCircle, Calendar,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -57,9 +57,12 @@ export default function QuotationsPage() {
           <h1 className="text-2xl font-bold text-foreground font-display">Quotations</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Estimates and quotes for customers</p>
         </div>
-        <Button asChild>
-          <Link href="/orders/new"><Plus className="w-4 h-4 mr-2" />New Quotation</Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => window.print()}><Printer className="w-4 h-4 mr-2" />Print</Button>
+          <Button asChild>
+            <Link href="/orders/new"><Plus className="w-4 h-4 mr-2" />New Quotation</Link>
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}
