@@ -138,7 +138,7 @@ export default function CustomersPage() {
   const [page, setPage] = useState(1);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const { data, isLoading } = useCustomers({
+  const { data, isLoading, isError, refetch } = useCustomers({
     page,
     per_page: 24,
     search: search || undefined,
@@ -155,7 +155,7 @@ export default function CustomersPage() {
         <div>
           <h1 className="text-2xl font-bold font-display">Customers</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {data ? `${data.total} customers` : "Loading…"}
+            {isLoading ? "Loading…" : isError ? "Error loading customers" : `${data?.total ?? 0} customers`}
           </p>
         </div>
         <Button asChild className="shadow-premium">
@@ -214,6 +214,17 @@ export default function CustomersPage() {
             <CustomerCardSkeleton key={i} />
           ))}
         </div>
+      ) : isError ? (
+        <EmptyState
+          title="Failed to load customers"
+          description="Something went wrong. Please try again."
+          icon={Users}
+          action={
+            <Button onClick={() => refetch()} variant="outline">
+              Retry
+            </Button>
+          }
+        />
       ) : !data?.items.length ? (
         <EmptyState
           title="No customers found"

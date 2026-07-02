@@ -252,7 +252,7 @@ export default function PaymentsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold font-display text-foreground">Payments</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Track revenue from completed service orders</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Track collected payments, invoice balances, and customer receipts.</p>
         </div>
         <div className="flex items-center gap-3">
           <Button

@@ -35,7 +35,7 @@ import {
   subMonths,
   parseISO,
 } from "date-fns";
-import { getJobGroup, sortJobsBySchedule, toDateKey } from "@/lib/business";
+import { getJobGroup, sortJobsBySchedule, toDateKey, formatTime } from "@/lib/business";
 import { Badge } from "@/components/ui/badge";
 
 interface CalendarJob {
@@ -408,7 +408,7 @@ export default function CalendarPage() {
                       {job.scheduled_time && (
                         <span className="flex items-center gap-1 text-xs text-muted-foreground">
                           <Clock className="w-3 h-3" />
-                          {job.scheduled_time}
+                          {formatTime(job.scheduled_time)}
                         </span>
                       )}
                       {!selectedDate && job.scheduled_date && (

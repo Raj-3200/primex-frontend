@@ -139,7 +139,11 @@ export default function NotificationsPage() {
         {isError ? (
           <div className="flex flex-col items-center justify-center py-16 text-center px-6">
             <Bell className="h-10 w-10 text-muted-foreground mb-3" />
-            <p className="text-muted-foreground">No notifications yet</p>
+            <p className="text-muted-foreground font-medium">Failed to load notifications</p>
+            <p className="text-sm text-muted-foreground mt-1">Something went wrong. Please try again.</p>
+            <Button variant="outline" size="sm" className="mt-4 rounded-xl" onClick={() => window.location.reload()}>
+              Retry
+            </Button>
           </div>
         ) : isLoading ? (
           <div className="divide-y divide-border">

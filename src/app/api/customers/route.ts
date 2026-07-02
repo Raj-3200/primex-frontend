@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   try {
     const sql = neon(DB_URL);
     const [rows, countRows] = await Promise.all([
-      sql`
+      search && propertyType && leadSource ? sql`
         SELECT
           c.id,c.customer_id,c.name,c.phone,c.alternate_phone,c.email,c.address,
           c.latitude,c.longitude,c.maps_url,c.gst_number,c.property_type,
@@ -30,20 +30,140 @@ export async function GET(req: NextRequest) {
         FROM customers c
         LEFT JOIN orders o ON o.customer_id = c.id AND o.is_deleted = false
         WHERE c.is_deleted = false
-          AND (${propertyType}::propertytypenum IS NULL OR c.property_type = ${propertyType}::propertytypenum)
-          AND (${leadSource}::leadsourceenum IS NULL OR c.lead_source = ${leadSource}::leadsourceenum)
-          AND (${searchFilter}::text IS NULL OR c.name ILIKE ${searchFilter} OR c.phone ILIKE ${searchFilter} OR c.customer_id ILIKE ${searchFilter})
-        GROUP BY c.id
-        ORDER BY c.created_at DESC
-        LIMIT ${per_page} OFFSET ${offset}
-      `,
-      sql`
-        SELECT COUNT(*)::int AS total
+          AND c.property_type::text = ${propertyType}
+          AND c.lead_source::text = ${leadSource}
+          AND (c.name ILIKE ${searchFilter} OR c.phone ILIKE ${searchFilter} OR c.customer_id ILIKE ${searchFilter})
+        GROUP BY c.id ORDER BY c.created_at DESC LIMIT ${per_page} OFFSET ${offset}
+      ` : search && propertyType ? sql`
+        SELECT
+          c.id,c.customer_id,c.name,c.phone,c.alternate_phone,c.email,c.address,
+          c.latitude,c.longitude,c.maps_url,c.gst_number,c.property_type,
+          c.lead_source,c.notes,c.created_at,c.updated_at,
+          COUNT(DISTINCT o.id)::int AS total_orders,
+          COUNT(DISTINCT o.id) FILTER (WHERE o.status = 'COMPLETED')::int AS completed_jobs,
+          COALESCE(SUM(o.total_amount) FILTER (WHERE o.status <> 'CANCELLED'),0) AS billed_amount,
+          COALESCE(SUM(o.total_amount) FILTER (WHERE o.status = 'COMPLETED'),0) AS paid_amount
         FROM customers c
+        LEFT JOIN orders o ON o.customer_id = c.id AND o.is_deleted = false
         WHERE c.is_deleted = false
-          AND (${propertyType}::propertytypenum IS NULL OR c.property_type = ${propertyType}::propertytypenum)
-          AND (${leadSource}::leadsourceenum IS NULL OR c.lead_source = ${leadSource}::leadsourceenum)
-          AND (${searchFilter}::text IS NULL OR c.name ILIKE ${searchFilter} OR c.phone ILIKE ${searchFilter} OR c.customer_id ILIKE ${searchFilter})
+          AND c.property_type::text = ${propertyType}
+          AND (c.name ILIKE ${searchFilter} OR c.phone ILIKE ${searchFilter} OR c.customer_id ILIKE ${searchFilter})
+        GROUP BY c.id ORDER BY c.created_at DESC LIMIT ${per_page} OFFSET ${offset}
+      ` : search && leadSource ? sql`
+        SELECT
+          c.id,c.customer_id,c.name,c.phone,c.alternate_phone,c.email,c.address,
+          c.latitude,c.longitude,c.maps_url,c.gst_number,c.property_type,
+          c.lead_source,c.notes,c.created_at,c.updated_at,
+          COUNT(DISTINCT o.id)::int AS total_orders,
+          COUNT(DISTINCT o.id) FILTER (WHERE o.status = 'COMPLETED')::int AS completed_jobs,
+          COALESCE(SUM(o.total_amount) FILTER (WHERE o.status <> 'CANCELLED'),0) AS billed_amount,
+          COALESCE(SUM(o.total_amount) FILTER (WHERE o.status = 'COMPLETED'),0) AS paid_amount
+        FROM customers c
+        LEFT JOIN orders o ON o.customer_id = c.id AND o.is_deleted = false
+        WHERE c.is_deleted = false
+          AND c.lead_source::text = ${leadSource}
+          AND (c.name ILIKE ${searchFilter} OR c.phone ILIKE ${searchFilter} OR c.customer_id ILIKE ${searchFilter})
+        GROUP BY c.id ORDER BY c.created_at DESC LIMIT ${per_page} OFFSET ${offset}
+      ` : search ? sql`
+        SELECT
+          c.id,c.customer_id,c.name,c.phone,c.alternate_phone,c.email,c.address,
+          c.latitude,c.longitude,c.maps_url,c.gst_number,c.property_type,
+          c.lead_source,c.notes,c.created_at,c.updated_at,
+          COUNT(DISTINCT o.id)::int AS total_orders,
+          COUNT(DISTINCT o.id) FILTER (WHERE o.status = 'COMPLETED')::int AS completed_jobs,
+          COALESCE(SUM(o.total_amount) FILTER (WHERE o.status <> 'CANCELLED'),0) AS billed_amount,
+          COALESCE(SUM(o.total_amount) FILTER (WHERE o.status = 'COMPLETED'),0) AS paid_amount
+        FROM customers c
+        LEFT JOIN orders o ON o.customer_id = c.id AND o.is_deleted = false
+        WHERE c.is_deleted = false
+          AND (c.name ILIKE ${searchFilter} OR c.phone ILIKE ${searchFilter} OR c.customer_id ILIKE ${searchFilter})
+        GROUP BY c.id ORDER BY c.created_at DESC LIMIT ${per_page} OFFSET ${offset}
+      ` : propertyType && leadSource ? sql`
+        SELECT
+          c.id,c.customer_id,c.name,c.phone,c.alternate_phone,c.email,c.address,
+          c.latitude,c.longitude,c.maps_url,c.gst_number,c.property_type,
+          c.lead_source,c.notes,c.created_at,c.updated_at,
+          COUNT(DISTINCT o.id)::int AS total_orders,
+          COUNT(DISTINCT o.id) FILTER (WHERE o.status = 'COMPLETED')::int AS completed_jobs,
+          COALESCE(SUM(o.total_amount) FILTER (WHERE o.status <> 'CANCELLED'),0) AS billed_amount,
+          COALESCE(SUM(o.total_amount) FILTER (WHERE o.status = 'COMPLETED'),0) AS paid_amount
+        FROM customers c
+        LEFT JOIN orders o ON o.customer_id = c.id AND o.is_deleted = false
+        WHERE c.is_deleted = false
+          AND c.property_type::text = ${propertyType}
+          AND c.lead_source::text = ${leadSource}
+        GROUP BY c.id ORDER BY c.created_at DESC LIMIT ${per_page} OFFSET ${offset}
+      ` : propertyType ? sql`
+        SELECT
+          c.id,c.customer_id,c.name,c.phone,c.alternate_phone,c.email,c.address,
+          c.latitude,c.longitude,c.maps_url,c.gst_number,c.property_type,
+          c.lead_source,c.notes,c.created_at,c.updated_at,
+          COUNT(DISTINCT o.id)::int AS total_orders,
+          COUNT(DISTINCT o.id) FILTER (WHERE o.status = 'COMPLETED')::int AS completed_jobs,
+          COALESCE(SUM(o.total_amount) FILTER (WHERE o.status <> 'CANCELLED'),0) AS billed_amount,
+          COALESCE(SUM(o.total_amount) FILTER (WHERE o.status = 'COMPLETED'),0) AS paid_amount
+        FROM customers c
+        LEFT JOIN orders o ON o.customer_id = c.id AND o.is_deleted = false
+        WHERE c.is_deleted = false
+          AND c.property_type::text = ${propertyType}
+        GROUP BY c.id ORDER BY c.created_at DESC LIMIT ${per_page} OFFSET ${offset}
+      ` : leadSource ? sql`
+        SELECT
+          c.id,c.customer_id,c.name,c.phone,c.alternate_phone,c.email,c.address,
+          c.latitude,c.longitude,c.maps_url,c.gst_number,c.property_type,
+          c.lead_source,c.notes,c.created_at,c.updated_at,
+          COUNT(DISTINCT o.id)::int AS total_orders,
+          COUNT(DISTINCT o.id) FILTER (WHERE o.status = 'COMPLETED')::int AS completed_jobs,
+          COALESCE(SUM(o.total_amount) FILTER (WHERE o.status <> 'CANCELLED'),0) AS billed_amount,
+          COALESCE(SUM(o.total_amount) FILTER (WHERE o.status = 'COMPLETED'),0) AS paid_amount
+        FROM customers c
+        LEFT JOIN orders o ON o.customer_id = c.id AND o.is_deleted = false
+        WHERE c.is_deleted = false
+          AND c.lead_source::text = ${leadSource}
+        GROUP BY c.id ORDER BY c.created_at DESC LIMIT ${per_page} OFFSET ${offset}
+      ` : sql`
+        SELECT
+          c.id,c.customer_id,c.name,c.phone,c.alternate_phone,c.email,c.address,
+          c.latitude,c.longitude,c.maps_url,c.gst_number,c.property_type,
+          c.lead_source,c.notes,c.created_at,c.updated_at,
+          COUNT(DISTINCT o.id)::int AS total_orders,
+          COUNT(DISTINCT o.id) FILTER (WHERE o.status = 'COMPLETED')::int AS completed_jobs,
+          COALESCE(SUM(o.total_amount) FILTER (WHERE o.status <> 'CANCELLED'),0) AS billed_amount,
+          COALESCE(SUM(o.total_amount) FILTER (WHERE o.status = 'COMPLETED'),0) AS paid_amount
+        FROM customers c
+        LEFT JOIN orders o ON o.customer_id = c.id AND o.is_deleted = false
+        WHERE c.is_deleted = false
+        GROUP BY c.id ORDER BY c.created_at DESC LIMIT ${per_page} OFFSET ${offset}
+      `,
+      // Count query — same filter branches
+      search && propertyType && leadSource ? sql`
+        SELECT COUNT(DISTINCT c.id)::int AS total FROM customers c
+        WHERE c.is_deleted = false AND c.property_type::text = ${propertyType}
+          AND c.lead_source::text = ${leadSource}
+          AND (c.name ILIKE ${searchFilter} OR c.phone ILIKE ${searchFilter} OR c.customer_id ILIKE ${searchFilter})
+      ` : search && propertyType ? sql`
+        SELECT COUNT(DISTINCT c.id)::int AS total FROM customers c
+        WHERE c.is_deleted = false AND c.property_type::text = ${propertyType}
+          AND (c.name ILIKE ${searchFilter} OR c.phone ILIKE ${searchFilter} OR c.customer_id ILIKE ${searchFilter})
+      ` : search && leadSource ? sql`
+        SELECT COUNT(DISTINCT c.id)::int AS total FROM customers c
+        WHERE c.is_deleted = false AND c.lead_source::text = ${leadSource}
+          AND (c.name ILIKE ${searchFilter} OR c.phone ILIKE ${searchFilter} OR c.customer_id ILIKE ${searchFilter})
+      ` : search ? sql`
+        SELECT COUNT(DISTINCT c.id)::int AS total FROM customers c
+        WHERE c.is_deleted = false
+          AND (c.name ILIKE ${searchFilter} OR c.phone ILIKE ${searchFilter} OR c.customer_id ILIKE ${searchFilter})
+      ` : propertyType && leadSource ? sql`
+        SELECT COUNT(DISTINCT c.id)::int AS total FROM customers c
+        WHERE c.is_deleted = false AND c.property_type::text = ${propertyType} AND c.lead_source::text = ${leadSource}
+      ` : propertyType ? sql`
+        SELECT COUNT(DISTINCT c.id)::int AS total FROM customers c
+        WHERE c.is_deleted = false AND c.property_type::text = ${propertyType}
+      ` : leadSource ? sql`
+        SELECT COUNT(DISTINCT c.id)::int AS total FROM customers c
+        WHERE c.is_deleted = false AND c.lead_source::text = ${leadSource}
+      ` : sql`
+        SELECT COUNT(*)::int AS total FROM customers WHERE is_deleted = false
       `,
     ]);
 

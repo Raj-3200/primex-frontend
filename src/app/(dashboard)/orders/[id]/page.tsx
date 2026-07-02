@@ -1,19 +1,37 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   ArrowLeft, Sun, Droplets, Activity, User, Phone,
   MapPin, Calendar, IndianRupee, Clock, CheckCircle, UserCheck,
+  MessageCircle, PhoneCall, CalendarClock, Loader2, X,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import {
+  formatSchedule, formatTime, getWhatsAppUrl,
+  getJobReminderMessage, getPaymentReminderMessage,
+} from "@/lib/business";
 import Link from "next/link";
+import { toast } from "sonner";
+import {
+  Dialog, DialogContent, DialogDescription,
+  DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 
 const SERVICE_ICONS: Record<string, any> = { SOLAR: Sun, TANK: Droplets, COMBINED: Activity };
 const SERVICE_COLORS: Record<string, string> = {
@@ -22,8 +40,18 @@ const SERVICE_COLORS: Record<string, string> = {
   COMBINED: "bg-green-500/15 text-green-600",
 };
 
+const ACTIVE_STATUSES = ["PENDING", "SCHEDULED", "IN_PROGRESS"];
+
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const qc = useQueryClient();
+
+  // Dialog state
+  const [showReschedule, setShowReschedule] = useState(false);
+  const [showCancel, setShowCancel] = useState(false);
+  const [showComplete, setShowComplete] = useState(false);
+  const [newDate, setNewDate] = useState("");
+  const [newTime, setNewTime] = useState("");
 
   const { data, isLoading } = useQuery({
     queryKey: ["order", id],
@@ -36,6 +64,29 @@ export default function OrderDetailPage() {
       return res.json();
     },
     enabled: !!id,
+  });
+
+  const { mutate: updateOrder, isPending: isUpdating } = useMutation({
+    mutationFn: async (payload: Record<string, unknown>) => {
+      const token = localStorage.getItem("access_token");
+      const res = await fetch(`/api/orders/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Failed to update order");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["order", id] });
+      qc.invalidateQueries({ queryKey: ["orders"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      toast.success("Order updated successfully");
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   if (isLoading) return (
@@ -61,9 +112,25 @@ export default function OrderDetailPage() {
   const { order, solar_detail, tank_detail, activity_logs = [] } = data;
   const Icon = SERVICE_ICONS[order.service_type] || Activity;
   const iconClass = SERVICE_COLORS[order.service_type] || "bg-muted text-muted-foreground";
+  const isActive = ACTIVE_STATUSES.includes(order.status);
+  const isCompleted = order.status === "COMPLETED";
+  const waJobMsg = getJobReminderMessage({
+    customerName: order.customer_name,
+    orderNumber: order.order_number,
+    serviceType: order.service_type,
+    scheduledDate: order.scheduled_date,
+    scheduledTime: order.scheduled_time,
+  });
+  const waPayMsg = getPaymentReminderMessage({
+    customerName: order.customer_name,
+    orderNumber: order.order_number,
+    amount: Number(order.total_amount),
+    serviceType: order.service_type,
+  });
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" asChild>
           <Link href="/orders"><ArrowLeft className="w-4 h-4" /></Link>
@@ -80,6 +147,70 @@ export default function OrderDetailPage() {
         <StatusBadge status={order.status} />
       </div>
 
+      {/* Action Bar */}
+      {(isActive || isCompleted) && (
+        <Card className="p-4 rounded-2xl">
+          <div className="flex flex-wrap gap-2 items-center">
+            <span className="text-xs font-medium text-muted-foreground mr-1">Actions:</span>
+
+            {isActive && (
+              <>
+                <Button
+                  size="sm" className="rounded-xl bg-green-600 hover:bg-green-700 text-white shadow-sm"
+                  onClick={() => setShowComplete(true)} disabled={isUpdating}
+                >
+                  {isUpdating ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <CheckCircle className="w-3.5 h-3.5 mr-1.5" />}
+                  Mark Completed
+                </Button>
+                <Button
+                  size="sm" variant="outline" className="rounded-xl"
+                  onClick={() => { setNewDate(order.scheduled_date?.slice(0, 10) || ""); setNewTime(order.scheduled_time?.slice(0, 5) || ""); setShowReschedule(true); }}
+                >
+                  <CalendarClock className="w-3.5 h-3.5 mr-1.5" />
+                  Reschedule
+                </Button>
+                <Button
+                  size="sm" variant="outline" className="rounded-xl text-destructive border-destructive/30 hover:bg-destructive/10"
+                  onClick={() => setShowCancel(true)} disabled={isUpdating}
+                >
+                  <X className="w-3.5 h-3.5 mr-1.5" />
+                  Cancel
+                </Button>
+              </>
+            )}
+
+            {order.customer_phone && (
+              <>
+                <a href={`tel:${order.customer_phone}`}>
+                  <Button size="sm" variant="outline" className="rounded-xl">
+                    <PhoneCall className="w-3.5 h-3.5 mr-1.5" />
+                    Call
+                  </Button>
+                </a>
+                <a
+                  href={getWhatsAppUrl(order.customer_phone, isCompleted ? waPayMsg : waJobMsg)}
+                  target="_blank" rel="noopener noreferrer"
+                >
+                  <Button size="sm" variant="outline" className="rounded-xl text-green-600 border-green-600/30 hover:bg-green-600/10">
+                    <MessageCircle className="w-3.5 h-3.5 mr-1.5" />
+                    WhatsApp
+                  </Button>
+                </a>
+              </>
+            )}
+
+            {isCompleted && (
+              <Link href="/invoices">
+                <Button size="sm" variant="outline" className="rounded-xl">
+                  <IndianRupee className="w-3.5 h-3.5 mr-1.5" />
+                  View Invoice
+                </Button>
+              </Link>
+            )}
+          </div>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Main Details */}
         <div className="lg:col-span-2 space-y-4">
@@ -93,8 +224,18 @@ export default function OrderDetailPage() {
                   {order.customer_name}
                 </Link>
               </div>
-              {order.customer_phone && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Phone className="w-4 h-4" />{order.customer_phone}</div>}
-              {order.customer_address && <div className="flex items-center gap-2 text-sm text-muted-foreground"><MapPin className="w-4 h-4" />{order.customer_address}{order.customer_city ? `, ${order.customer_city}` : ""}</div>}
+              {order.customer_phone && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Phone className="w-4 h-4" />
+                  <a href={`tel:${order.customer_phone}`} className="hover:text-foreground transition-colors">{order.customer_phone}</a>
+                </div>
+              )}
+              {order.customer_address && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <MapPin className="w-4 h-4" />
+                  {order.customer_address}
+                </div>
+              )}
             </div>
           </Card>
 
@@ -113,7 +254,7 @@ export default function OrderDetailPage() {
                 <Clock className="w-4 h-4 text-muted-foreground" />
                 <div>
                   <p className="text-xs text-muted-foreground">Time</p>
-                  <p className="font-medium">{order.scheduled_time ? String(order.scheduled_time).slice(0, 5) : "Not set"}</p>
+                  <p className="font-medium">{order.scheduled_time ? formatTime(order.scheduled_time) : "Not set"}</p>
                 </div>
               </div>
               {order.completed_at && (
@@ -209,6 +350,81 @@ export default function OrderDetailPage() {
           </Card>
         </div>
       </div>
+
+      {/* Reschedule Dialog */}
+      <Dialog open={showReschedule} onOpenChange={setShowReschedule}>
+        <DialogContent className="rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Reschedule Order</DialogTitle>
+            <DialogDescription>Pick a new date and time for this job.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>New Date</Label>
+              <Input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} className="rounded-xl" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>New Time (optional)</Label>
+              <Input type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} className="rounded-xl" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowReschedule(false)} className="rounded-xl">Cancel</Button>
+            <Button
+              disabled={!newDate || isUpdating} className="rounded-xl"
+              onClick={() => {
+                updateOrder({ scheduled_date: newDate, scheduled_time: newTime || null });
+                setShowReschedule(false);
+              }}
+            >
+              {isUpdating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CalendarClock className="w-4 h-4 mr-2" />}
+              Reschedule
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mark Completed Dialog */}
+      <AlertDialog open={showComplete} onOpenChange={setShowComplete}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Mark as Completed?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will mark {order.order_number} as completed. You can then record a payment or send a receipt.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="rounded-xl bg-green-600 hover:bg-green-700"
+              onClick={() => { updateOrder({ status: "COMPLETED" }); setShowComplete(false); }}
+            >
+              Mark Completed
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cancel Dialog */}
+      <AlertDialog open={showCancel} onOpenChange={setShowCancel}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Order?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will cancel {order.order_number}. The customer will need to book again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Keep Order</AlertDialogCancel>
+            <AlertDialogAction
+              className="rounded-xl bg-destructive hover:bg-destructive/90"
+              onClick={() => { updateOrder({ status: "CANCELLED" }); setShowCancel(false); }}
+            >
+              Cancel Order
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

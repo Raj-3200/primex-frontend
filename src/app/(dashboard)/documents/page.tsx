@@ -12,22 +12,16 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate, formatCurrency } from "@/lib/utils";
 
-// Documents = orders with solar/tank detail photos (real images stored in DB)
+// Documents = orders with service records, reports, and receipts
 export default function DocumentsPage() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ["documents"],
     queryFn: async () => {
       const token = localStorage.getItem("access_token");
-      // Fetch orders that have service details (photos)
       const res = await fetch("/api/orders?per_page=50", { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) throw new Error("Failed");
       const ordersData = await res.json();
-
-      // Also get solar and tank detail counts
-      const statsRes = await fetch("/api/reports", { headers: { Authorization: `Bearer ${token}` } });
-      const stats = statsRes.ok ? await statsRes.json() : null;
-
-      return { orders: ordersData.items, total: ordersData.total, stats };
+      return { orders: ordersData.items, total: ordersData.total };
     },
     staleTime: 30_000,
   });
@@ -129,9 +123,13 @@ export default function DocumentsPage() {
                       <Button variant="outline" size="sm" className="flex-1 text-xs h-8 rounded-lg" asChild>
                         <Link href={`/orders/${order.id}`}><Eye className="w-3 h-3 mr-1" />View Report</Link>
                       </Button>
+                    ) : order.status !== "CANCELLED" ? (
+                      <Button variant="outline" size="sm" className="flex-1 text-xs h-8 rounded-lg" asChild>
+                        <Link href={`/orders/${order.id}`}><FileText className="w-3 h-3 mr-1" />Prepare Report</Link>
+                      </Button>
                     ) : (
                       <Button variant="outline" size="sm" className="flex-1 text-xs h-8 rounded-lg" disabled>
-                        Report Not Ready
+                        Cancelled
                       </Button>
                     )}
                     <Button variant="ghost" size="sm" className="text-xs h-8 rounded-lg px-2" title="Print" disabled={!isReportReady} onClick={() => window.print()}>
