@@ -243,18 +243,13 @@ export default function OrderDetailPage() {
           <Card className="p-5 rounded-2xl">
             <h2 className="text-sm font-bold font-display mb-3 text-muted-foreground uppercase tracking-wide">Schedule</h2>
             <div className="grid grid-cols-2 gap-4">
-              <div className="flex items-center gap-2 text-sm">
+              <div className="flex items-center gap-2 text-sm col-span-2">
                 <Calendar className="w-4 h-4 text-muted-foreground" />
                 <div>
-                  <p className="text-xs text-muted-foreground">Scheduled Date</p>
-                  <p className="font-medium">{order.scheduled_date ? formatDate(order.scheduled_date) : "Not set"}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <Clock className="w-4 h-4 text-muted-foreground" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Time</p>
-                  <p className="font-medium">{order.scheduled_time ? formatTime(order.scheduled_time) : "Not set"}</p>
+                  <p className="text-xs text-muted-foreground">Scheduled</p>
+                  <p className="font-medium">
+                    {order.scheduled_date ? formatSchedule(order.scheduled_date, order.scheduled_time) : "Not scheduled"}
+                  </p>
                 </div>
               </div>
               {order.completed_at && (

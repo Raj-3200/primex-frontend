@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatSchedule } from "@/lib/business";
 import Link from "next/link";
 
 export default function CustomerDetailPage() {
@@ -140,7 +141,7 @@ export default function CustomerDetailPage() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium group-hover:text-primary transition-colors">{o.order_number}</p>
                       <p className="text-xs text-muted-foreground">
-                        {o.scheduled_date ? `${formatDate(o.scheduled_date)}${o.scheduled_time ? ` · ${String(o.scheduled_time).slice(0, 5)}` : ""}` : formatDate(o.created_at)}
+                        {o.scheduled_date ? formatSchedule(o.scheduled_date, o.scheduled_time) : formatDate(o.created_at)}
                       </p>
                     </div>
                     <StatusBadge status={o.status} />

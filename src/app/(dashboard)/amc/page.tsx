@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { QueryError } from "@/components/ui/error-boundary";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
+import { formatSchedule } from "@/lib/business";
 import Link from "next/link";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -29,6 +30,7 @@ interface AMCContract {
   customer_address: string;
   status: string;
   scheduled_date: string | null;
+  scheduled_time: string | null;
   total_amount: number;
   created_at: string;
   completed_at: string | null;
@@ -217,7 +219,7 @@ export default function AMCPage() {
                       {formatCurrency(Number(contract.total_amount))}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {contract.scheduled_date ? formatDate(contract.scheduled_date) : "—"}
+                      {contract.scheduled_date ? formatSchedule(contract.scheduled_date, contract.scheduled_time) : "—"}
                     </TableCell>
                     <TableCell>
                       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${sc.classes}`}>

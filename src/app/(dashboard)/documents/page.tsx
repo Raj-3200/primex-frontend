@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate, formatCurrency } from "@/lib/utils";
+import { formatSchedule } from "@/lib/business";
 
 // Documents = orders with service records, reports, and receipts
 export default function DocumentsPage() {
@@ -115,7 +116,7 @@ export default function DocumentsPage() {
                     </Badge>
                   </div>
                   <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
-                    <span>{formatDate(order.created_at)}</span>
+                    <span>{order.scheduled_date ? formatSchedule(order.scheduled_date, order.scheduled_time) : formatDate(order.created_at)}</span>
                     <span className="font-medium text-foreground">{formatCurrency(order.total_amount)}</span>
                   </div>
                   <div className="flex items-center gap-2">
