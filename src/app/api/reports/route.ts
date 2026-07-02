@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
     const [monthly, topCustomers, serviceBreakdown, statusBreakdown, financeRows, expenseRows] =
       await Promise.all([
         sql`SELECT TO_CHAR(DATE_TRUNC('month', completed_at), 'Mon YYYY') AS month, DATE_TRUNC('month', completed_at) AS month_date, COALESCE(SUM(total_amount), 0) AS revenue, COUNT(*)::int AS orders FROM orders WHERE status = 'COMPLETED' AND is_deleted = false AND completed_at >= NOW() - INTERVAL '12 months' GROUP BY DATE_TRUNC('month', completed_at) ORDER BY month_date ASC`,
-        sql`SELECT c.id, c.name, c.name AS customer_name, c.customer_id AS customer_code, COUNT(o.id)::int AS order_count, COALESCE(SUM(o.total_amount), 0) AS total_revenue FROM customers c JOIN orders o ON o.customer_id = c.id AND o.is_deleted = false WHERE c.is_deleted = false GROUP BY c.id, c.name, c.customer_id ORDER BY total_revenue DESC LIMIT 8`,
+        sql`SELECT c.id, c.name, c.name AS customer_name, c.customer_id AS customer_code, COUNT(o.id)::int AS order_count, COALESCE(SUM(o.total_amount) FILTER (WHERE o.status <> 'CANCELLED'), 0) AS billed_amount, COALESCE(SUM(o.total_amount) FILTER (WHERE o.status = 'COMPLETED'), 0) AS collected_amount FROM customers c JOIN orders o ON o.customer_id = c.id AND o.is_deleted = false WHERE c.is_deleted = false GROUP BY c.id, c.name, c.customer_id ORDER BY billed_amount DESC LIMIT 8`,
         sql`SELECT service_type, COUNT(*)::int AS count, COALESCE(SUM(total_amount), 0) AS revenue FROM orders WHERE is_deleted = false GROUP BY service_type`,
         sql`SELECT status, COUNT(*)::int AS count FROM orders WHERE is_deleted = false GROUP BY status`,
         sql`
@@ -36,7 +36,9 @@ export async function GET(req: NextRequest) {
       })),
       top_customers: topCustomers.map((r: any) => ({
         ...r,
-        total_revenue: Number(r.total_revenue),
+        billed_amount: Number(r.billed_amount),
+        collected_amount: Number(r.collected_amount),
+        total_revenue: Number(r.billed_amount),
       })),
       service_breakdown: serviceBreakdown.map((r: any) => ({
         service_type: r.service_type,

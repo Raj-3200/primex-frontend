@@ -111,9 +111,15 @@ function CustomerCard({ customer, onDelete }: CustomerCardProps) {
             </div>
             <div className="text-center">
               <p className="text-xs font-bold text-foreground tabular-nums">
-                {formatCurrency(customer.total_spent)}
+                {formatCurrency(customer.billed_amount ?? customer.total_spent)}
               </p>
-              <p className="text-[10px] text-muted-foreground">Total Spent</p>
+              <p className="text-[10px] text-muted-foreground">Billed</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs font-bold text-foreground tabular-nums">
+                {formatCurrency(customer.due_amount ?? 0)}
+              </p>
+              <p className="text-[10px] text-muted-foreground">Due</p>
             </div>
           </div>
           <p className="text-[10px] text-muted-foreground">

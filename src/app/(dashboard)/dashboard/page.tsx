@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
 import {
   IndianRupee,
   TrendingUp,
@@ -36,9 +37,10 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { formatCurrency } from "@/lib/utils";
 import Link from "next/link";
-import { getWhatsAppUrl } from "@/lib/business";
+import { formatSchedule, getWhatsAppUrl } from "@/lib/business";
 import { useUpdateOrderStatus } from "@/features/orders/hooks/use-orders";
 
 // ── Skeleton loader for the dashboard ─────────────────────────────────────
@@ -75,9 +77,25 @@ function ChartTooltip({ active, payload, label }: any) {
 
 const PIE_COLORS = ["#E8722A", "#3B82F6", "#22C55E"];
 
+function getToken() {
+  if (typeof window === "undefined") return "";
+  return localStorage.getItem("access_token") || "";
+}
+
 export default function DashboardPage() {
   const { data, isLoading, isError } = useDashboard();
   const { mutate: updateOrderStatus, isPending: isUpdatingOrder } = useUpdateOrderStatus();
+  const { data: followupData } = useQuery({
+    queryKey: ["followups"],
+    queryFn: async () => {
+      const response = await fetch("/api/followups", {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!response.ok) throw new Error("Failed to load follow-ups");
+      return response.json();
+    },
+    staleTime: 60_000,
+  });
 
   if (isLoading) return <DashboardSkeleton />;
 
@@ -96,6 +114,7 @@ export default function DashboardPage() {
 
   const { stats, revenue_chart, service_distribution, upcoming_jobs, needs_confirmation = [], recent_activity } =
     data!;
+  const followups = followupData?.followups ?? [];
 
   const pieData = [
     { name: "Solar", value: service_distribution.solar },
@@ -140,7 +159,7 @@ export default function DashboardPage() {
           </div>
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
             {needs_confirmation.map((job) => {
-              const message = `Hello ${job.customer_name}, this is PrimeX Services. We are checking your ${job.service_type.toLowerCase()} service scheduled on ${formatDate(job.scheduled_date)}${job.scheduled_time ? ` at ${job.scheduled_time}` : ""}. Please confirm if everything was completed.`;
+              const message = `Hello ${job.customer_name}, this is PrimeX Services. We are checking your ${job.service_type.toLowerCase()} service scheduled on ${formatSchedule(job.scheduled_date, job.scheduled_time)}. Please confirm if everything was completed.`;
               return (
                 <div key={job.id} className="rounded-xl border border-red-200 bg-white p-4">
                   <div className="flex items-start justify-between gap-3">
@@ -151,7 +170,7 @@ export default function DashboardPage() {
                       <p className="font-semibold truncate">{job.customer_name}</p>
                       <p className="text-xs text-muted-foreground truncate">{job.customer_address || "Address not added"}</p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {formatDate(job.scheduled_date)}{job.scheduled_time ? ` · ${job.scheduled_time}` : ""} · {formatCurrency(job.total_amount ?? 0)}
+                        {formatSchedule(job.scheduled_date, job.scheduled_time)} · {formatCurrency(job.total_amount ?? 0)}
                       </p>
                     </div>
                     <StatusBadge status="PENDING" showDot={false} className="bg-red-100 text-red-700 border-red-200" />
@@ -214,6 +233,45 @@ export default function DashboardPage() {
       </Card>
 
       {/* ── Stats Grid (8 cards) ────────────────────────────────────── */}
+      <Card className="p-5 rounded-2xl border-border shadow-sm">
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div>
+            <h2 className="text-base font-bold text-foreground font-display">Smart WhatsApp Follow-up Center</h2>
+            <p className="text-sm text-muted-foreground">Payment reminders, job confirmations, quotation nudges, AMC reminders, and review requests.</p>
+          </div>
+          <Badge variant="outline">{followups.length} ready</Badge>
+        </div>
+        {followups.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-6">No follow-ups needed right now.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            {followups.slice(0, 6).map((item: any) => (
+              <div key={item.id} className="rounded-xl border border-border p-4 bg-background">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <Badge variant="secondary" className="mb-2 capitalize">{String(item.type).replace("_", " ")}</Badge>
+                    <p className="font-semibold truncate">{item.customer_name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{item.title} · {item.order_number}</p>
+                    {item.due_label && <p className="text-xs text-muted-foreground mt-1">{item.due_label}</p>}
+                  </div>
+                  {item.amount ? <p className="text-sm font-bold text-primary">{formatCurrency(item.amount)}</p> : null}
+                </div>
+                <div className="flex gap-2 mt-4">
+                  <Button asChild size="sm" className="flex-1" disabled={!item.has_phone}>
+                    <a href={item.whatsapp_url} target="_blank" rel="noreferrer">
+                      <MessageCircle className="w-3.5 h-3.5 mr-1" />Send
+                    </a>
+                  </Button>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={item.href}>Open</Link>
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
       <motion.div
         initial="hidden"
         animate="visible"
@@ -464,8 +522,7 @@ export default function DashboardPage() {
                       {job.customer_name}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {job.order_number} · {formatDate(job.scheduled_date)}
-                      {job.scheduled_time && ` · ${job.scheduled_time}`}
+                      {job.order_number} · {formatSchedule(job.scheduled_date, job.scheduled_time)}
                     </p>
                   </div>
                   <StatusBadge status={job.status} />

@@ -23,18 +23,26 @@ export async function GET(req: NextRequest, { params }: Params) {
           FROM customers c
           LEFT JOIN users cb ON cb.id = c.created_by
           WHERE c.id = ${id}::uuid AND c.is_deleted = false LIMIT 1`,
-      sql`SELECT id, order_number, service_type, status, total_amount, created_at, scheduled_date
+      sql`SELECT id, order_number, service_type, status, total_amount, created_at, scheduled_date, scheduled_time
           FROM orders WHERE customer_id = ${id}::uuid AND is_deleted = false ORDER BY created_at DESC LIMIT 20`,
       sql`SELECT COUNT(*)::int as total_orders,
-            COALESCE(SUM(total_amount), 0) as total_revenue,
-            SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END)::int as completed
+            SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END)::int as completed,
+            COALESCE(SUM(total_amount) FILTER (WHERE status <> 'CANCELLED'), 0) as lifetime_billed,
+            COALESCE(SUM(total_amount) FILTER (WHERE status = 'COMPLETED'), 0) as lifetime_paid
           FROM orders WHERE customer_id = ${id}::uuid AND is_deleted = false`,
     ]);
     if (!customers[0]) return NextResponse.json({ detail: "Not found" }, { status: 404 });
     return NextResponse.json({
       customer: customers[0],
       orders: orders.map((o: any) => ({ ...o, total_amount: Number(o.total_amount) })),
-      stats: { total_orders: Number(stats[0].total_orders), total_revenue: Number(stats[0].total_revenue), completed: Number(stats[0].completed) },
+      stats: {
+        total_orders: Number(stats[0].total_orders),
+        completed: Number(stats[0].completed),
+        lifetime_billed: Number(stats[0].lifetime_billed),
+        lifetime_paid: Number(stats[0].lifetime_paid),
+        due_amount: Math.max(0, Number(stats[0].lifetime_billed) - Number(stats[0].lifetime_paid)),
+        total_revenue: Number(stats[0].lifetime_paid),
+      },
     });
   } catch (err) { console.error(err); return NextResponse.json({ detail: "Server error" }, { status: 500 }); }
 }

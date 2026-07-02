@@ -84,7 +84,9 @@ export default function AMCPage() {
     { label: "Total Contracts", value: stats.total ?? 0, icon: FileText, bg: "bg-orange-50", color: "text-orange-500" },
     { label: "Active", value: stats.pending ?? 0, icon: RefreshCcw, bg: "bg-blue-50", color: "text-blue-500" },
     { label: "Completed", value: stats.completed ?? 0, icon: CheckCircle2, bg: "bg-emerald-50", color: "text-emerald-500" },
-    { label: "Total Revenue", value: formatCurrency(stats.revenue ?? 0), icon: DollarSign, bg: "bg-purple-50", color: "text-purple-500", isText: true },
+    { label: "Contract Value", value: formatCurrency(stats.contract_value ?? stats.revenue ?? 0), icon: DollarSign, bg: "bg-purple-50", color: "text-purple-500", isText: true },
+    { label: "Collected", value: formatCurrency(stats.collected ?? stats.revenue ?? 0), icon: TrendingUp, bg: "bg-green-50", color: "text-green-500", isText: true },
+    { label: "Pending Amount", value: formatCurrency(stats.pending_amount ?? 0), icon: Clock, bg: "bg-yellow-50", color: "text-yellow-500", isText: true },
   ];
 
   return (
@@ -103,7 +105,7 @@ export default function AMCPage() {
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-6">
         {statCards.map((card) => (
           <div key={card.label} className="rounded-2xl border border-border bg-card p-5 shadow-sm">
             <div className="flex items-center gap-3 mb-2">

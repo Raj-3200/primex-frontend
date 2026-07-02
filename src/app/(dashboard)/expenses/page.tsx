@@ -8,7 +8,7 @@ import { z } from "zod";
 import {
   Receipt, Plus, Search, Pencil, Trash2,
   Car, Wrench, ShoppingCart, Users, Zap, MoreHorizontal,
-  DollarSign, TrendingDown, Calendar,
+  DollarSign, TrendingDown, Calendar, Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -37,6 +37,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { QueryError } from "@/components/ui/error-boundary";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { apiFetch } from "@/lib/backend";
+import { downloadCsv } from "@/lib/business";
 
 // ─── Types & constants ────────────────────────────────────────────────────────
 type ExpenseCategory = "VEHICLE" | "EQUIPMENT" | "SUPPLIES" | "STAFF" | "UTILITIES" | "OTHER";
@@ -224,9 +225,25 @@ export default function ExpensesPage() {
           <h1 className="text-2xl font-bold font-display text-foreground">Expenses</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Track operational costs and business expenses</p>
         </div>
-        <Button onClick={() => { setEditingExpense(undefined); setDialogOpen(true); }} className="gap-2">
-          <Plus className="h-4 w-4" />Record Expense
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => downloadCsv("primex-expenses.csv", filtered.map((expense) => ({
+              date: expense.expense_date,
+              category: expense.category,
+              description: expense.description,
+              amount: expense.amount,
+              reference: expense.reference ?? "",
+            })))}
+            disabled={filtered.length === 0}
+            className="gap-2"
+          >
+            <Download className="h-4 w-4" />Export
+          </Button>
+          <Button onClick={() => { setEditingExpense(undefined); setDialogOpen(true); }} className="gap-2">
+            <Plus className="h-4 w-4" />Record Expense
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}

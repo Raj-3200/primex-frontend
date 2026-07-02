@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
           c.address AS customer_address
         FROM orders o
         LEFT JOIN customers c ON c.id = o.customer_id AND c.is_deleted = false
-        WHERE o.service_type = 'SOLAR' AND o.is_deleted = false
+        WHERE o.service_type IN ('SOLAR','COMBINED') AND o.is_deleted = false
         ORDER BY o.created_at DESC
       `,
       sql`
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
           COUNT(*) FILTER (WHERE status = 'COMPLETED')                      AS completed,
           COUNT(*) FILTER (WHERE status IN ('PENDING','SCHEDULED','IN_PROGRESS')) AS pending,
           COALESCE(SUM(total_amount) FILTER (WHERE status = 'COMPLETED'), 0) AS revenue
-        FROM orders WHERE service_type = 'SOLAR' AND is_deleted = false
+        FROM orders WHERE service_type IN ('SOLAR','COMBINED') AND is_deleted = false
       `,
     ]);
 

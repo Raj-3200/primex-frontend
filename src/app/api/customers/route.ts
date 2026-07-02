@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import { requireAuth, requireAuthPayload, SECRET, DB_URL } from "@/lib/server-auth";
+import { requireAuth, requireAuthPayload, DB_URL } from "@/lib/server-auth";
 
-
-// GET /api/customers — paginated, filtered list with order counts
 export async function GET(req: NextRequest) {
   const authError = requireAuth(req);
   if (authError) return authError;
@@ -12,44 +10,62 @@ export async function GET(req: NextRequest) {
   const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
   const per_page = Math.min(100, parseInt(searchParams.get("per_page") || "24"));
   const search = (searchParams.get("search") || "").trim();
-  const property_type = (searchParams.get("property_type") || "").trim();
-  const lead_source = (searchParams.get("lead_source") || "").trim();
+  const propertyType = (searchParams.get("property_type") || "").trim() || null;
+  const leadSource = (searchParams.get("lead_source") || "").trim() || null;
   const offset = (page - 1) * per_page;
+  const searchFilter = search ? `%${search}%` : null;
 
   try {
     const sql = neon(DB_URL);
-    const sp = search ? `%${search}%` : "";
+    const [rows, countRows] = await Promise.all([
+      sql`
+        SELECT
+          c.id,c.customer_id,c.name,c.phone,c.alternate_phone,c.email,c.address,
+          c.latitude,c.longitude,c.maps_url,c.gst_number,c.property_type,
+          c.lead_source,c.notes,c.created_at,c.updated_at,
+          COUNT(DISTINCT o.id)::int AS total_orders,
+          COUNT(DISTINCT o.id) FILTER (WHERE o.status = 'COMPLETED')::int AS completed_jobs,
+          COALESCE(SUM(o.total_amount) FILTER (WHERE o.status <> 'CANCELLED'),0) AS billed_amount,
+          COALESCE(SUM(o.total_amount) FILTER (WHERE o.status = 'COMPLETED'),0) AS paid_amount
+        FROM customers c
+        LEFT JOIN orders o ON o.customer_id = c.id AND o.is_deleted = false
+        WHERE c.is_deleted = false
+          AND (${propertyType}::propertytypenum IS NULL OR c.property_type = ${propertyType}::propertytypenum)
+          AND (${leadSource}::leadsourceenum IS NULL OR c.lead_source = ${leadSource}::leadsourceenum)
+          AND (${searchFilter}::text IS NULL OR c.name ILIKE ${searchFilter} OR c.phone ILIKE ${searchFilter} OR c.customer_id ILIKE ${searchFilter})
+        GROUP BY c.id
+        ORDER BY c.created_at DESC
+        LIMIT ${per_page} OFFSET ${offset}
+      `,
+      sql`
+        SELECT COUNT(*)::int AS total
+        FROM customers c
+        WHERE c.is_deleted = false
+          AND (${propertyType}::propertytypenum IS NULL OR c.property_type = ${propertyType}::propertytypenum)
+          AND (${leadSource}::leadsourceenum IS NULL OR c.lead_source = ${leadSource}::leadsourceenum)
+          AND (${searchFilter}::text IS NULL OR c.name ILIKE ${searchFilter} OR c.phone ILIKE ${searchFilter} OR c.customer_id ILIKE ${searchFilter})
+      `,
+    ]);
 
-    // Use neon's tagged template — all values are properly escaped by Neon's driver
-    // We branch to avoid empty-string parameters causing type errors
-    let rows: any[], countRows: any[];
-
-    if (search && property_type) {
-      [rows, countRows] = await Promise.all([
-        sql`SELECT c.id,c.customer_id,c.name,c.phone,c.alternate_phone,c.email,c.address,c.latitude,c.longitude,c.maps_url,c.gst_number,c.property_type,c.lead_source,c.notes,c.created_at,c.updated_at,COUNT(DISTINCT o.id)::int AS total_orders,COALESCE(SUM(CASE WHEN o.status='COMPLETED' THEN o.total_amount ELSE 0 END),0) AS total_spent FROM customers c LEFT JOIN orders o ON o.customer_id=c.id AND o.is_deleted=false WHERE c.is_deleted=false AND c.property_type=${property_type} AND(c.name ILIKE ${sp} OR c.phone ILIKE ${sp} OR c.customer_id ILIKE ${sp}) GROUP BY c.id ORDER BY c.created_at DESC LIMIT ${per_page} OFFSET ${offset}`,
-        sql`SELECT COUNT(*)::int AS total FROM customers c WHERE c.is_deleted=false AND c.property_type=${property_type} AND(c.name ILIKE ${sp} OR c.phone ILIKE ${sp} OR c.customer_id ILIKE ${sp})`,
-      ]);
-    } else if (search) {
-      [rows, countRows] = await Promise.all([
-        sql`SELECT c.id,c.customer_id,c.name,c.phone,c.alternate_phone,c.email,c.address,c.latitude,c.longitude,c.maps_url,c.gst_number,c.property_type,c.lead_source,c.notes,c.created_at,c.updated_at,COUNT(DISTINCT o.id)::int AS total_orders,COALESCE(SUM(CASE WHEN o.status='COMPLETED' THEN o.total_amount ELSE 0 END),0) AS total_spent FROM customers c LEFT JOIN orders o ON o.customer_id=c.id AND o.is_deleted=false WHERE c.is_deleted=false AND(c.name ILIKE ${sp} OR c.phone ILIKE ${sp} OR c.customer_id ILIKE ${sp}) GROUP BY c.id ORDER BY c.created_at DESC LIMIT ${per_page} OFFSET ${offset}`,
-        sql`SELECT COUNT(*)::int AS total FROM customers c WHERE c.is_deleted=false AND(c.name ILIKE ${sp} OR c.phone ILIKE ${sp} OR c.customer_id ILIKE ${sp})`,
-      ]);
-    } else if (property_type) {
-      [rows, countRows] = await Promise.all([
-        sql`SELECT c.id,c.customer_id,c.name,c.phone,c.alternate_phone,c.email,c.address,c.latitude,c.longitude,c.maps_url,c.gst_number,c.property_type,c.lead_source,c.notes,c.created_at,c.updated_at,COUNT(DISTINCT o.id)::int AS total_orders,COALESCE(SUM(CASE WHEN o.status='COMPLETED' THEN o.total_amount ELSE 0 END),0) AS total_spent FROM customers c LEFT JOIN orders o ON o.customer_id=c.id AND o.is_deleted=false WHERE c.is_deleted=false AND c.property_type=${property_type} GROUP BY c.id ORDER BY c.created_at DESC LIMIT ${per_page} OFFSET ${offset}`,
-        sql`SELECT COUNT(*)::int AS total FROM customers WHERE is_deleted=false AND property_type=${property_type}`,
-      ]);
-    } else {
-      [rows, countRows] = await Promise.all([
-        sql`SELECT c.id,c.customer_id,c.name,c.phone,c.alternate_phone,c.email,c.address,c.latitude,c.longitude,c.maps_url,c.gst_number,c.property_type,c.lead_source,c.notes,c.created_at,c.updated_at,COUNT(DISTINCT o.id)::int AS total_orders,COALESCE(SUM(CASE WHEN o.status='COMPLETED' THEN o.total_amount ELSE 0 END),0) AS total_spent FROM customers c LEFT JOIN orders o ON o.customer_id=c.id AND o.is_deleted=false WHERE c.is_deleted=false GROUP BY c.id ORDER BY c.created_at DESC LIMIT ${per_page} OFFSET ${offset}`,
-        sql`SELECT COUNT(*)::int AS total FROM customers WHERE is_deleted=false`,
-      ]);
-    }
-
-    const total = countRows[0]?.total ?? 0;
+    const total = Number(countRows[0]?.total ?? 0);
     return NextResponse.json({
-      items: rows.map((r: any) => ({ ...r, total_spent: Number(r.total_spent) })),
-      total, page, per_page, pages: Math.ceil(total / per_page),
+      items: rows.map((row: any) => {
+        const billed = Number(row.billed_amount ?? 0);
+        const paid = Number(row.paid_amount ?? 0);
+        return {
+          ...row,
+          total_orders: Number(row.total_orders ?? 0),
+          completed_jobs: Number(row.completed_jobs ?? 0),
+          billed_amount: billed,
+          paid_amount: paid,
+          due_amount: Math.max(0, billed - paid),
+          total_spent: paid,
+        };
+      }),
+      total,
+      page,
+      per_page,
+      pages: Math.ceil(total / per_page),
     });
   } catch (err) {
     console.error("[Customers GET]", err);
@@ -57,10 +73,9 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/customers
 export async function POST(req: NextRequest) {
   const authResult = requireAuthPayload(req);
-  if ('error' in authResult) return authResult.error;
+  if ("error" in authResult) return authResult.error;
   const userId = authResult.payload.sub;
 
   try {
@@ -81,14 +96,17 @@ export async function POST(req: NextRequest) {
       FROM customers
       WHERE customer_id LIKE 'PX-C-%'
     `;
-    const customer_id = `PX-C-${String((maxRow[0]?.max_num ?? 0) + 1).padStart(4, '0')}`;
+    const customer_id = `PX-C-${String((maxRow[0]?.max_num ?? 0) + 1).padStart(4, "0")}`;
 
     const rows = await sql`
       INSERT INTO customers(id,customer_id,name,phone,alternate_phone,email,address,latitude,longitude,maps_url,gst_number,property_type,lead_source,notes,created_by,is_deleted)
-      VALUES(gen_random_uuid(),${customer_id},${name.trim()},${phone.trim()},${alternate_phone||null},${email||null},${address.trim()},${latitude||null},${longitude||null},${maps_url||null},${gst_number||null},${property_type},${lead_source||"OTHER"},${notes||null},${userId}::uuid,false)
+      VALUES(gen_random_uuid(),${customer_id},${name.trim()},${phone.trim()},${alternate_phone || null},${email || null},${address.trim()},${latitude || null},${longitude || null},${maps_url || null},${gst_number || null},${property_type},${lead_source || "OTHER"},${notes || null},${userId}::uuid,false)
       RETURNING id,customer_id,name,phone,alternate_phone,email,address,latitude,longitude,maps_url,gst_number,property_type,lead_source,notes,created_at,updated_at
     `;
-    return NextResponse.json({ ...rows[0], total_orders: 0, total_spent: 0 }, { status: 201 });
+    return NextResponse.json(
+      { ...rows[0], total_orders: 0, completed_jobs: 0, billed_amount: 0, paid_amount: 0, due_amount: 0, total_spent: 0 },
+      { status: 201 },
+    );
   } catch (err: any) {
     console.error("[Customers POST]", err);
     if (String(err).includes("unique")) return NextResponse.json({ detail: "Phone number already exists" }, { status: 409 });

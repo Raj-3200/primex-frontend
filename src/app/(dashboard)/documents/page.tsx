@@ -81,7 +81,13 @@ export default function DocumentsPage() {
       </div>
 
       {/* Order Documents Grid */}
-      {isLoading ? (
+      {isError ? (
+        <Card className="py-16 text-center rounded-2xl">
+          <FolderOpen className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+          <p className="font-semibold mb-1">Documents could not be loaded</p>
+          <p className="text-sm text-muted-foreground">Please refresh and try again.</p>
+        </Card>
+      ) : isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-40 rounded-2xl" />)}
         </div>
@@ -98,6 +104,7 @@ export default function DocumentsPage() {
             const Icon = order.service_type === "SOLAR" ? Sun : order.service_type === "TANK" ? Droplets : Activity;
             const iconBg = order.service_type === "SOLAR" ? "bg-amber-100" : order.service_type === "TANK" ? "bg-blue-100" : "bg-green-100";
             const iconColor = order.service_type === "SOLAR" ? "text-amber-600" : order.service_type === "TANK" ? "text-blue-600" : "text-green-600";
+            const isReportReady = order.status === "COMPLETED";
             return (
               <motion.div key={order.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
                 <Card className="p-5 rounded-2xl hover:shadow-md transition-shadow">
@@ -118,11 +125,17 @@ export default function DocumentsPage() {
                     <span className="font-medium text-foreground">{formatCurrency(order.total_amount)}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" className="flex-1 text-xs h-8 rounded-lg" asChild>
-                      <Link href={`/orders/${order.id}`}><Eye className="w-3 h-3 mr-1" />View Report</Link>
-                    </Button>
-                    <Button variant="ghost" size="sm" className="text-xs h-8 rounded-lg px-2" title="Download">
-                      <FileText className="w-3 h-3" onClick={() => window.print()} />
+                    {isReportReady ? (
+                      <Button variant="outline" size="sm" className="flex-1 text-xs h-8 rounded-lg" asChild>
+                        <Link href={`/orders/${order.id}`}><Eye className="w-3 h-3 mr-1" />View Report</Link>
+                      </Button>
+                    ) : (
+                      <Button variant="outline" size="sm" className="flex-1 text-xs h-8 rounded-lg" disabled>
+                        Report Not Ready
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="sm" className="text-xs h-8 rounded-lg px-2" title="Print" disabled={!isReportReady} onClick={() => window.print()}>
+                      <FileText className="w-3 h-3" />
                     </Button>
                   </div>
                 </Card>

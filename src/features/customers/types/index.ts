@@ -16,6 +16,10 @@ export interface Customer {
   created_at: string;
   updated_at: string;
   total_orders: number;
+  completed_jobs?: number;
+  billed_amount?: number;
+  paid_amount?: number;
+  due_amount?: number;
   total_spent: number;
 }
 

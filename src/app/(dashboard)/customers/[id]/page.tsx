@@ -105,11 +105,12 @@ export default function CustomerDetailPage() {
 
         {/* Stats */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
               { label: "Total Orders", value: stats?.total_orders ?? 0, icon: ShoppingBag },
-              { label: "Total Revenue", value: formatCurrency(stats?.total_revenue ?? 0), icon: IndianRupee },
-              { label: "Completed", value: stats?.completed ?? 0, icon: Activity },
+              { label: "Billed", value: formatCurrency(stats?.lifetime_billed ?? 0), icon: IndianRupee },
+              { label: "Paid", value: formatCurrency(stats?.lifetime_paid ?? 0), icon: IndianRupee },
+              { label: "Due", value: formatCurrency(stats?.due_amount ?? 0), icon: Activity },
             ].map((s) => (
               <Card key={s.label} className="p-4 rounded-2xl">
                 <s.icon className="w-4 h-4 text-primary mb-2" />
@@ -138,7 +139,9 @@ export default function CustomerDetailPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium group-hover:text-primary transition-colors">{o.order_number}</p>
-                      <p className="text-xs text-muted-foreground">{formatDate(o.created_at)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {o.scheduled_date ? `${formatDate(o.scheduled_date)}${o.scheduled_time ? ` · ${String(o.scheduled_time).slice(0, 5)}` : ""}` : formatDate(o.created_at)}
+                      </p>
                     </div>
                     <StatusBadge status={o.status} />
                     <p className="text-sm font-semibold text-primary">{formatCurrency(o.total_amount)}</p>

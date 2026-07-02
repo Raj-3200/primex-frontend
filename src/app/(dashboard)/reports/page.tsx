@@ -59,10 +59,9 @@ export default function ReportsPage() {
   const { monthly_revenue = [], top_customers = [], service_breakdown = [], status_breakdown = [], finance } = data;
 
   // Compute summary from data
-  const totalRevenue = finance?.collected ?? monthly_revenue.reduce((s: number, r: any) => s + r.revenue, 0);
+  const totalCollected = finance?.collected ?? monthly_revenue.reduce((s: number, r: any) => s + r.revenue, 0);
   const totalOrders = status_breakdown.reduce((s: number, r: any) => s + r.count, 0);
-  const totalCustomers = top_customers.length;
-  const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+  const avgOrderValue = totalOrders > 0 ? totalCollected / totalOrders : 0;
 
   // Service distribution for pie
   const pieData = service_breakdown.map((s: any) => ({
@@ -96,12 +95,13 @@ export default function ReportsPage() {
       </div>
 
       {/* Summary Cards */}
-      <motion.div className="grid grid-cols-2 md:grid-cols-4 gap-4"
+      <motion.div className="grid grid-cols-2 md:grid-cols-5 gap-4"
         initial="hidden" animate="visible"
         variants={{ visible: { transition: { staggerChildren: 0.06 } }, hidden: {} }}>
         {[
-          { label: "Total Revenue", value: formatCurrency(totalRevenue), icon: IndianRupee, color: "text-primary" },
-          { label: "Unpaid Invoices", value: formatCurrency(finance?.outstanding ?? 0), icon: ShoppingBag, color: "text-blue-500" },
+          { label: "Total Billed", value: formatCurrency(finance?.billed ?? 0), icon: IndianRupee, color: "text-primary" },
+          { label: "Collected", value: formatCurrency(totalCollected), icon: ShoppingBag, color: "text-green-500" },
+          { label: "Outstanding", value: formatCurrency(finance?.outstanding ?? 0), icon: ShoppingBag, color: "text-blue-500" },
           { label: "Expenses", value: formatCurrency(finance?.expenses ?? 0), icon: Users, color: "text-red-500" },
           { label: "Estimated Profit", value: formatCurrency(finance?.profit ?? avgOrderValue), icon: TrendingUp, color: "text-green-500" },
         ].map((card) => (
@@ -120,8 +120,8 @@ export default function ReportsPage() {
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card className="lg:col-span-2 p-6 rounded-2xl">
-          <h2 className="text-base font-bold font-display mb-1">Revenue Trend</h2>
-          <p className="text-xs text-muted-foreground mb-6">Last 6 months</p>
+          <h2 className="text-base font-bold font-display mb-1">Collections Trend</h2>
+          <p className="text-xs text-muted-foreground mb-6">Completed job collections by month</p>
           {monthly_revenue.length === 0 ? (
             <div className="flex items-center justify-center h-52 text-sm text-muted-foreground">No revenue data yet</div>
           ) : (
@@ -137,7 +137,7 @@ export default function ReportsPage() {
                 <XAxis dataKey="month" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
                 <Tooltip formatter={(v: any) => formatCurrency(v)} contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 12 }} />
-                <Area type="monotone" dataKey="revenue" stroke="#E8722A" strokeWidth={2.5} fill="url(#revGrad)" name="Revenue" />
+                <Area type="monotone" dataKey="revenue" stroke="#E8722A" strokeWidth={2.5} fill="url(#revGrad)" name="Collected" />
               </AreaChart>
             </ResponsiveContainer>
           )}
@@ -165,7 +165,7 @@ export default function ReportsPage() {
       {/* Bottom Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card className="p-6 rounded-2xl">
-          <h2 className="text-base font-bold font-display mb-4">Top Customers</h2>
+          <h2 className="text-base font-bold font-display mb-4">Top Customers by Billed Value</h2>
           {top_customers.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">No customer data yet</p>
           ) : (
@@ -175,9 +175,11 @@ export default function ReportsPage() {
                   <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0">{i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{c.name || c.customer_name}</p>
-                    <p className="text-xs text-muted-foreground">{c.order_count} orders</p>
+                    <p className="text-xs text-muted-foreground">
+                      {c.order_count} orders · collected {formatCurrency(c.collected_amount ?? 0)}
+                    </p>
                   </div>
-                  <p className="text-sm font-semibold text-primary">{formatCurrency(c.total_revenue)}</p>
+                  <p className="text-sm font-semibold text-primary">{formatCurrency(c.billed_amount ?? c.total_revenue)}</p>
                 </div>
               ))}
             </div>

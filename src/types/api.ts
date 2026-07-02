@@ -36,6 +36,9 @@ export interface Customer {
   city: string;
   state: string;
   zipcode: string;
+  billed_amount?: number;
+  paid_amount?: number;
+  due_amount?: number;
   total_spent: number;
   is_active: boolean;
   created_at: string;

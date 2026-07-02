@@ -23,8 +23,8 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { formatCurrency, formatDate } from "@/lib/utils";
-import { downloadCsv, getJobGroup, getWhatsAppUrl, sortJobsBySchedule, type JobGroup } from "@/lib/business";
+import { formatCurrency } from "@/lib/utils";
+import { downloadCsv, formatSchedule, getJobGroup, getJobReminderMessage, getWhatsAppUrl, sortJobsBySchedule, type JobGroup } from "@/lib/business";
 import type { Order } from "@/features/orders/types";
 
 const STATUS_FLOW: Record<string, string[]> = {
@@ -42,7 +42,13 @@ function OrderRow({ order }: { order: Order }) {
 
   const nextStatuses = STATUS_FLOW[order.status] ?? [];
   const group = getJobGroup(order);
-  const reminder = `Hello ${order.customer_name}, this is PrimeX Services. Your ${order.service_type.toLowerCase()} job ${order.order_number} is scheduled for ${order.scheduled_date ? formatDate(order.scheduled_date) : "the planned date"}${order.scheduled_time ? ` at ${order.scheduled_time}` : ""}.`;
+  const reminder = getJobReminderMessage({
+    customerName: order.customer_name || "Customer",
+    orderNumber: order.order_number,
+    serviceType: order.service_type,
+    scheduledDate: order.scheduled_date,
+    scheduledTime: order.scheduled_time,
+  });
 
   const handleReschedule = () => {
     const newDate = window.prompt("New scheduled date (YYYY-MM-DD)", order.scheduled_date?.slice(0, 10) || "");
@@ -102,7 +108,7 @@ function OrderRow({ order }: { order: Order }) {
       </td>
       <td className="py-3 px-4">
         <span className="text-sm text-muted-foreground">
-          {order.scheduled_date ? formatDate(order.scheduled_date) : "—"}
+          {formatSchedule(order.scheduled_date, order.scheduled_time)}
         </span>
       </td>
       <td className="py-3 px-4">
@@ -214,7 +220,7 @@ export default function OrdersPage() {
               service: order.service_type,
               status: order.status,
               group: getJobGroup(order),
-              scheduled_date: order.scheduled_date,
+              scheduled: formatSchedule(order.scheduled_date, order.scheduled_time),
               amount: order.total_amount,
             })))}
           >

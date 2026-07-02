@@ -2,6 +2,7 @@
 import { API_BASE } from '@/lib/backend';
 
 import { useQuery } from '@tanstack/react-query';
+import Link from 'next/link';
 import {
   FileText,
   XCircle,
@@ -9,7 +10,8 @@ import {
   Printer,
   CheckCircle2,
   Clock,
-  AlertCircle,
+  Eye,
+  MessageCircle,
 } from 'lucide-react';
 import {
   Table,
@@ -22,7 +24,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { formatCurrency, formatDate } from '@/lib/utils';
-import { downloadCsv } from '@/lib/business';
+import { downloadCsv, getPaymentReminderMessage, getWhatsAppUrl } from '@/lib/business';
 
 function getToken() {
   if (typeof window === 'undefined') return '';
@@ -41,30 +43,20 @@ const statusConfig: Record<
   string,
   { label: string; icon: React.ReactNode; classes: string }
 > = {
-  COMPLETED: {
+  PAID: {
     label: 'Paid',
     icon: <CheckCircle2 className="h-3.5 w-3.5" />,
-    classes: 'text-emerald-700 bg-emerald-50',
+    classes: 'text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-300',
   },
-  PENDING: {
-    label: 'Pending',
+  UNPAID: {
+    label: 'Unpaid',
     icon: <Clock className="h-3.5 w-3.5" />,
-    classes: 'text-yellow-700 bg-yellow-50',
-  },
-  SCHEDULED: {
-    label: 'Scheduled',
-    icon: <Clock className="h-3.5 w-3.5" />,
-    classes: 'text-blue-700 bg-blue-50',
-  },
-  IN_PROGRESS: {
-    label: 'In Progress',
-    icon: <AlertCircle className="h-3.5 w-3.5" />,
-    classes: 'text-purple-700 bg-purple-50',
+    classes: 'text-yellow-700 bg-yellow-50 dark:bg-yellow-950/40 dark:text-yellow-300',
   },
   CANCELLED: {
     label: 'Cancelled',
     icon: <XCircle className="h-3.5 w-3.5" />,
-    classes: 'text-red-700 bg-red-50',
+    classes: 'text-red-700 bg-red-50 dark:bg-red-950/40 dark:text-red-300',
   },
 };
 
@@ -81,10 +73,8 @@ export default function InvoicesPage() {
     (sum: number, inv: any) => sum + Number(inv.total_amount || 0),
     0
   );
-  const paidInvoices = invoices.filter((inv: any) => inv.status === 'COMPLETED');
-  const pendingInvoices = invoices.filter((inv: any) =>
-    ['PENDING', 'SCHEDULED', 'IN_PROGRESS'].includes(inv.status)
-  );
+  const paidInvoices = invoices.filter((inv: any) => inv.invoice_status === 'PAID');
+  const pendingInvoices = invoices.filter((inv: any) => inv.invoice_status === 'UNPAID');
 
   return (
     <div className="space-y-6">
@@ -102,7 +92,10 @@ export default function InvoicesPage() {
             customer: invoice.customer_name,
             service: invoice.service_type,
             amount: invoice.total_amount,
-            status: invoice.status === 'COMPLETED' ? 'Paid' : 'Outstanding',
+            paid: invoice.paid_amount,
+            balance: invoice.balance_amount,
+            status: invoice.invoice_status,
+            due_date: invoice.due_date,
           })))}>
             <Download className="h-4 w-4 mr-1" />Export
           </Button>
@@ -198,15 +191,25 @@ export default function InvoicesPage() {
                 <TableHead>Invoice #</TableHead>
                 <TableHead>Customer</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead>Service</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Date</TableHead>
+              <TableHead>Service</TableHead>
+              <TableHead>Amount</TableHead>
+              <TableHead>Paid</TableHead>
+              <TableHead>Balance</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead>Due</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {invoices.map((inv: any) => {
-                const status = statusConfig[inv.status] ?? statusConfig['PENDING'];
+                const status = statusConfig[inv.invoice_status] ?? statusConfig.UNPAID;
+                const reminder = getPaymentReminderMessage({
+                  customerName: inv.customer_name,
+                  orderNumber: inv.order_number,
+                  amount: Number(inv.balance_amount || inv.total_amount || 0),
+                  serviceType: inv.service_type,
+                });
                 return (
                   <TableRow key={inv.id}>
                     <TableCell className="font-mono font-semibold text-orange-600">
@@ -226,6 +229,12 @@ export default function InvoicesPage() {
                     <TableCell className="font-semibold text-foreground">
                       {formatCurrency(Number(inv.total_amount))}
                     </TableCell>
+                    <TableCell className="text-emerald-600 font-medium">
+                      {formatCurrency(Number(inv.paid_amount || 0))}
+                    </TableCell>
+                    <TableCell className="text-amber-600 font-medium">
+                      {formatCurrency(Number(inv.balance_amount || 0))}
+                    </TableCell>
                     <TableCell>
                       <span
                         className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${status.classes}`}
@@ -236,6 +245,23 @@ export default function InvoicesPage() {
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {formatDate(inv.created_at)}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {formatDate(inv.due_date || inv.created_at)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button asChild variant="ghost" size="icon" className="h-8 w-8">
+                          <Link href={`/orders/${inv.id}`} title="View order">
+                            <Eye className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                        <Button asChild variant="ghost" size="icon" className="h-8 w-8" disabled={!inv.customer_phone || inv.invoice_status !== 'UNPAID'}>
+                          <a href={getWhatsAppUrl(inv.customer_phone, reminder)} target="_blank" rel="noreferrer" title="WhatsApp reminder">
+                            <MessageCircle className="h-4 w-4" />
+                          </a>
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );

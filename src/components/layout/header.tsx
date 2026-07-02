@@ -37,7 +37,28 @@ export function Header({ title }: HeaderProps) {
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const trimmedSearch = useMemo(() => search.trim(), [search]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const loadNotifications = async () => {
+      const token = localStorage.getItem("access_token") || "";
+      const response = await fetch("/api/notifications", {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      }).catch(() => null);
+      if (!response?.ok) return;
+      const data = await response.json();
+      setUnreadCount(Number(data.unreadCount ?? 0));
+    };
+    loadNotifications();
+    const interval = window.setInterval(loadNotifications, 60_000);
+    return () => {
+      controller.abort();
+      window.clearInterval(interval);
+    };
+  }, []);
 
   useEffect(() => {
     if (trimmedSearch.length < 2) {
@@ -153,9 +174,11 @@ export function Header({ title }: HeaderProps) {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="h-9 w-9 relative">
               <Bell className="w-4 h-4" />
-              <Badge className="absolute -top-0.5 -right-0.5 h-4 w-4 p-0 flex items-center justify-center text-[10px] bg-primary">
-                3
-              </Badge>
+              {unreadCount > 0 && (
+                <Badge className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 flex items-center justify-center text-[10px] bg-primary">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </Badge>
+              )}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-80">

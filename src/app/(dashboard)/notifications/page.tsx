@@ -97,7 +97,7 @@ export default function NotificationsPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 gap-4">
         <div className="rounded-2xl border border-border shadow-sm p-6 bg-card flex items-center gap-4">
-          <div className="rounded-xl p-3 bg-orange-50">
+          <div className="rounded-xl p-3 bg-orange-50 dark:bg-orange-950/40">
             <Bell className="h-5 w-5 text-orange-500" />
           </div>
           <div>
@@ -112,7 +112,7 @@ export default function NotificationsPage() {
           </div>
         </div>
         <div className="rounded-2xl border border-border shadow-sm p-6 bg-card flex items-center gap-4">
-          <div className="rounded-xl p-3 bg-yellow-50">
+          <div className="rounded-xl p-3 bg-yellow-50 dark:bg-yellow-950/40">
             <BellOff className="h-5 w-5 text-yellow-500" />
           </div>
           <div>
@@ -171,7 +171,7 @@ export default function NotificationsPage() {
                 key={notif.id}
                 className={cn(
                   "px-6 py-4 flex gap-4 items-start transition-colors hover:bg-muted/30",
-                  !notif.is_read && "bg-orange-50/50",
+                  !notif.is_read && "bg-orange-50/60 dark:bg-orange-950/20",
                 )}
               >
                 {/* Unread dot */}

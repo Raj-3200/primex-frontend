@@ -17,13 +17,15 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { EmptyState } from "@/components/shared/empty-state";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
+import { formatSchedule } from "@/lib/business";
 
 interface Order {
   id: string;
   order_number: string;
   status: string;
   scheduled_date: string | null;
+  scheduled_time: string | null;
   total_amount: number;
   customer_name: string;
   customer_address: string;
@@ -145,7 +147,7 @@ export default function SolarPage() {
 
       {/* Table Card */}
       <div className="rounded-2xl border border-border shadow-sm p-6">
-        <h2 className="text-lg font-semibold mb-4">All Solar Jobs</h2>
+        <h2 className="text-lg font-semibold mb-4">Solar Jobs <span className="text-xs font-normal text-muted-foreground">(includes combined contracts)</span></h2>
 
         {isError && (
           <p className="text-sm text-destructive">
@@ -173,7 +175,7 @@ export default function SolarPage() {
                 <TableHead>Order #</TableHead>
                 <TableHead>Customer</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Scheduled Date</TableHead>
+                <TableHead>Scheduled</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -201,7 +203,7 @@ export default function SolarPage() {
                   </TableCell>
                   <TableCell>
                     {order.scheduled_date
-                      ? formatDate(order.scheduled_date)
+                      ? formatSchedule(order.scheduled_date, order.scheduled_time)
                       : "—"}
                   </TableCell>
                   <TableCell className="text-right font-medium">
